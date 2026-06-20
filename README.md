@@ -6,7 +6,7 @@ Unlike single-model detectors, AttackLayer employs a **defense-in-depth** archit
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
 *   **Ensemble Voting Layer**: Combines predictions from SVM, XGBoost, LightGBM, and an MLP. Uses dynamic weighted majority voting to determine if an input is an attack.
 *   **Model Reputation & Dynamic Weights**: Continuously monitors the performance of each model. If a model consistently disagrees with the consensus, its voting weight is dynamically reduced.
@@ -17,65 +17,11 @@ Unlike single-model detectors, AttackLayer employs a **defense-in-depth** archit
 
 ---
 
-## 🏗️ Architecture & Data Flow
+##  Architecture & Data Flow
 
 When a new embedding (memory fact or prompt) enters the system, it traverses a multi-layered security gauntlet.
 
-```mermaid
-graph TD
-    %% Define Styles
-    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef security fill:#ffebee,stroke:#b71c1c,stroke-width:2px;
-    classDef model fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px;
-    classDef logic fill:#fff3e0,stroke:#e65100,stroke-width:2px;
-    classDef output fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
 
-    %% Nodes
-    A[Incoming Request / Embedding]:::input
-    B{Adversarial Guard}:::security
-    C[Dataset Guard<br/>IsolationForest]:::security
-    D[Model Manager<br/>SHA-256 Integrity Check]:::logic
-    
-    E[SVM Model]:::model
-    F[XGBoost Model]:::model
-    G[LightGBM Model]:::model
-    H[MLP Model]:::model
-    
-    I[Ensemble Voting Layer<br/>Weighted Majority]:::logic
-    J[Model Reputation Engine<br/>Updates Weights]:::logic
-    
-    K{Trust Engine /<br/>Policy Engine}:::logic
-    L[ALLOW<br/>Store in Vault]:::output
-    M[BLOCK / QUARANTINE<br/>Flag for Review]:::output
-
-    %% Flow
-    A --> B
-    B -- Suspicious --> M
-    B -- Safe --> D
-    
-    %% Training Data path (conceptual)
-    C -. Filters Training Data .-> E
-    C -. Filters Training Data .-> F
-    C -. Filters Training Data .-> G
-    C -. Filters Training Data .-> H
-
-    D -- Loads & Verifies --> E
-    D -- Loads & Verifies --> F
-    D -- Loads & Verifies --> G
-    D -- Loads & Verifies --> H
-    
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-    
-    I --> J
-    J -. Adjusts Weights .-> I
-    
-    I -- Final Prediction --> K
-    K -- Benign --> L
-    K -- Attack --> M
-```
 
 ### End-to-End Execution Flow
 
@@ -91,7 +37,7 @@ graph TD
 
 ---
 
-## 🚀 Setup & Execution Instructions
+##  Setup & Execution Instructions
 
 ### 1. Prerequisites
 Ensure you have Python 3.10+ installed.
@@ -156,7 +102,7 @@ python -m pytest tests/ -v
 
 ---
 
-## 📊 Reports & Visualizations
+##  Reports & Visualizations
 
 After running `benchmark_models.py`, check the `reports/` and `figures/` folders for detailed metrics:
 *   `reports/metrics_table.csv`: Raw precision, recall, F1, and FPR scores.
