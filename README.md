@@ -44,7 +44,7 @@ Ensure you have Python 3.10+ installed.
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/SharvaniLekkala/AttackLayer.git
 cd AttackLayer/backend
 
 # Create and activate a virtual environment
