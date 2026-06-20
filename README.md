@@ -109,3 +109,25 @@ After running `benchmark_models.py`, check the `reports/` and `figures/` folders
 *   `figures/radar_chart.png`: A multi-axis comparison of model strengths.
 *   `figures/roc_curves.png`: AUC-ROC performance.
 *   `figures/shap_summary_xgboost.png`: Explainability plots showing which embedding dimensions drive the attack classifications.
+
+##  Images:
+<img width="1280" height="639" alt="image" src="https://github.com/user-attachments/assets/f9d402ab-dbce-4845-825d-f498ca4fcc92" />
+<img width="1278" height="588" alt="image" src="https://github.com/user-attachments/assets/601049c8-2ebe-4864-a125-1d8922e2c816" />
+<img width="1280" height="585" alt="image" src="https://github.com/user-attachments/assets/d94d5bd6-081c-44f8-a638-2106f823dff6" />
+<img width="1280" height="586" alt="image" src="https://github.com/user-attachments/assets/0e6275b0-0d8c-43fa-8425-a1d5801d7015" />
+<img width="1280" height="586" alt="image" src="https://github.com/user-attachments/assets/2f27a4d2-5bc3-4be6-9e9a-3ebbef3eb503" />
+<img width="1280" height="581" alt="image" src="https://github.com/user-attachments/assets/f9a42198-f0a8-48a9-a15a-4ee9869826ae" />
+<img width="1278" height="582" alt="image" src="https://github.com/user-attachments/assets/efc62f5c-4e5e-4346-98ff-950ce0a85104" />
+<img width="1280" height="586" alt="image" src="https://github.com/user-attachments/assets/bde25cc0-d950-4e10-91f5-52b3b33fbd80" />
+<img width="1280" height="578" alt="image" src="https://github.com/user-attachments/assets/7039bb43-53f4-4c68-a58e-b745c6845676" />
+<img width="1280" height="581" alt="image" src="https://github.com/user-attachments/assets/534234bb-9135-4f08-8668-8b924adea1cb" />
+
+
+
+
+
+
+
+
+
+
