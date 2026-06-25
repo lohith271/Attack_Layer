@@ -1,7 +1,16 @@
+import os
 import ollama
 
-
 CHAT_MODEL = "llama3.2"
+
+OLLAMA_BASE_URL = os.getenv(
+    "OLLAMA_BASE_URL",
+    "http://localhost:11434"
+)
+
+client = ollama.Client(
+    host=OLLAMA_BASE_URL
+)
 
 
 def generate_response(
@@ -138,7 +147,7 @@ Generate only the assistant response.
 
 """
 
-    response = ollama.chat(
+    response = client.chat(
 
         model=CHAT_MODEL,
 
