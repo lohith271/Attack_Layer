@@ -122,49 +122,7 @@ function ChatPage() {
 
         return () => intervals.forEach(clearInterval);
     }, [pendingHitlIds]);
-    // On mount, resume polling for any pending HITL requests
-    useEffect(() => {
-        const intervals = [];
 
-        function checkPending() {
-            const pending = JSON.parse(localStorage.getItem("pendingHitl") || "[]");
-            if (pending.length === 0) return;
-
-            pending.forEach(({ reqId, sessionId }) => {
-                const poll = setInterval(async () => {
-                    try {
-                        const status = await getHitlStatus(reqId);
-                        if (status.resolved) {
-                            clearInterval(poll);
-                            // Remove from pending
-                            const current = JSON.parse(localStorage.getItem("pendingHitl") || "[]");
-                            localStorage.setItem("pendingHitl", JSON.stringify(current.filter((p) => p.reqId !== reqId)));
-
-                            const followUp = {
-                                role: "assistant",
-                                content: status.response,
-                                time: new Date().toISOString(),
-                            };
-                            setSessions((prev) =>
-                                prev.map((s) => {
-                                    if (s.id !== sessionId) return s;
-                                    const updatedMsgs = [...s.messages, followUp];
-                                    updateSession(s.id, { messages: updatedMsgs });
-                                    return { ...s, messages: updatedMsgs };
-                                })
-                            );
-                        }
-                    } catch {
-                        clearInterval(poll);
-                    }
-                }, 3000);
-                intervals.push(poll);
-            });
-        }
-
-        checkPending();
-        return () => intervals.forEach(clearInterval);
-    }, []);
 
     function handleNewChat() {
             const session = createSession();

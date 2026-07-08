@@ -53,6 +53,23 @@ def _add_missing_columns(table_name, column_defs):
                 )
 
 
+def _correct_classification_stats_logic():
+    inspector = inspect(engine)
+    if "classification_stats" not in inspector.get_table_names():
+        return
+    with engine.begin() as conn:
+        # Correct false positive records:
+        # 1. Any record that was blocked but NOT user corrected is a TRUE positive, so is_false_positive should be FALSE
+        conn.execute(
+            text("UPDATE classification_stats SET is_false_positive = 0 WHERE was_blocked = 1 AND predicted_label != 'SAFE' AND user_corrected = 0")
+        )
+        # 2. Any record that was blocked AND was user corrected is a FALSE positive, so is_false_positive should be TRUE
+        conn.execute(
+            text("UPDATE classification_stats SET is_false_positive = 1 WHERE was_blocked = 1 AND predicted_label != 'SAFE' AND user_corrected = 1")
+        )
+
+
 def run_migrations():
     _add_missing_columns("memories", MEMORY_COLUMNS)
     _add_missing_columns("audit_events", AUDIT_COLUMNS)
+    _correct_classification_stats_logic()

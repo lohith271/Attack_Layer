@@ -332,6 +332,104 @@
   background: #b91c1c;
 }
 
+/* ===== REFRESH & SCAN STYLING ===== */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-icon svg {
+  animation: spin 1s linear infinite;
+}
+
+.refresh-item-btn:hover:not(:disabled) {
+  background: var(--color-success) !important;
+  color: white !important;
+  border-color: var(--color-success) !important;
+}
+
+.refresh-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.refresh-panel-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover) !important;
+  color: white !important;
+  border-color: var(--color-primary-hover) !important;
+}
+
+.scan-notification {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  box-shadow: var(--shadow-md);
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.notification-success {
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  color: var(--color-success);
+}
+
+.notification-warning {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning);
+}
+
+.notification-danger {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
+}
+
+.notification-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.notification-msg {
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+.notification-close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  font-weight: 300;
+  color: currentColor;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+  margin-left: 16px;
+}
+
+.notification-close-btn:hover {
+  opacity: 1;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1100px) {
   .memory-panels {
@@ -343,4 +441,4 @@
   .memory-panels {
     grid-template-columns: 1fr;
   }
-}
+}

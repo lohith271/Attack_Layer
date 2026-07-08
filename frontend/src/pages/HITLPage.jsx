@@ -38,12 +38,14 @@ function HITLCard({ request, onApprove, onReject }) {
         setBusy(false);
     }
 
+    const isMemory = request.memory_id != null;
+
     return (
         <div className="hitl-card">
             {/* Header */}
             <div className="hitl-card-header">
                 <div>
-                    <div className="hitl-card-id">Request #{request.id}</div>
+                    <div className="hitl-card-id">{isMemory ? `Memory Item #${request.memory_id}` : `Request #${request.id}`}</div>
                     <div className="hitl-card-tags">
                         {request.threat_type && (
                             <span className="hitl-tag threat">
@@ -62,7 +64,7 @@ function HITLCard({ request, onApprove, onReject }) {
             {/* Body */}
             <div className="hitl-card-body">
                 <div className="hitl-field">
-                    <div className="hitl-field-label">User Prompt</div>
+                    <div className="hitl-field-label">{isMemory ? "Memory Fact / Contaminated Content" : "User Prompt"}</div>
                     <div className="hitl-field-value prompt-text">{request.prompt}</div>
                 </div>
                 <div className="hitl-field">
@@ -77,11 +79,11 @@ function HITLCard({ request, onApprove, onReject }) {
             <div className="hitl-card-footer">
                 <button className="approve-btn" onClick={handleApprove} disabled={busy}>
                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve & Execute
+                    {isMemory ? "Approve & Save (Yes)" : "Approve & Execute (Yes)"}
                 </button>
                 <button className="reject-btn" onClick={handleReject} disabled={busy}>
                     <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Reject & Block
+                    {isMemory ? "Reject & Delete (No)" : "Reject & Block (No)"}
                 </button>
             </div>
         </div>
@@ -94,6 +96,7 @@ function HITLPage() {
     const [approved, setApproved] = useState(0);
     const [rejected, setRejected] = useState(0);
     const [answeredItems, setAnsweredItems] = useState([]);
+    const [activeTab, setActiveTab] = useState("prompts");
     const { toasts, addToast } = useToasts();
 
     const loadQueue = useCallback(async () => {
@@ -131,6 +134,7 @@ function HITLPage() {
                     prompt: req?.prompt,
                     status: "approved",
                     response: res.response || "(no response returned)",
+                    memory_id: req?.memory_id,
                 },
                 ...prev,
             ]);
@@ -151,7 +155,8 @@ function HITLPage() {
                     id,
                     prompt: req?.prompt,
                     status: "rejected",
-                    response: "Request rejected and blocked by security policy.",
+                    response: req?.memory_id ? "Memory permanently deleted." : "Request rejected and blocked by security policy.",
+                    memory_id: req?.memory_id,
                 },
                 ...prev,
             ]);
@@ -169,6 +174,14 @@ function HITLPage() {
             </div>
         );
     }
+
+    const promptQueue = queue.filter(req => req.memory_id == null);
+    const memoryQueue = queue.filter(req => req.memory_id != null);
+    const activeQueue = activeTab === "prompts" ? promptQueue : memoryQueue;
+    
+    const resolvedPrompts = answeredItems.filter(item => item.memory_id == null);
+    const resolvedMemories = answeredItems.filter(item => item.memory_id != null);
+    const activeResolved = activeTab === "prompts" ? resolvedPrompts : resolvedMemories;
 
     return (
         <>
@@ -201,12 +214,28 @@ function HITLPage() {
                 </div>
             </div>
 
+            {/* Tabs */}
+            <div className="hitl-tabs-container">
+                <button 
+                    className={`hitl-tab-btn ${activeTab === "prompts" ? "active" : ""}`}
+                    onClick={() => setActiveTab("prompts")}
+                >
+                    Prompts & Chat Requests ({promptQueue.length})
+                </button>
+                <button 
+                    className={`hitl-tab-btn ${activeTab === "memories" ? "active" : ""}`}
+                    onClick={() => setActiveTab("memories")}
+                >
+                    Memory Scans ({memoryQueue.length})
+                </button>
+            </div>
+
             {/* Queue header */}
             <div className="hitl-queue-header">
                 <div className="hitl-queue-title">
-                    Pending Queue
-                    {queue.length > 0 && (
-                        <span className="hitl-count-badge">{queue.length}</span>
+                    Pending {activeTab === "prompts" ? "Prompts" : "Memory Scans"}
+                    {activeQueue.length > 0 && (
+                        <span className="hitl-count-badge">{activeQueue.length}</span>
                     )}
                 </div>
                 <button className="hitl-refresh-btn" onClick={loadQueue}>
@@ -219,17 +248,17 @@ function HITLPage() {
             </div>
 
             {/* Queue */}
-            {queue.length === 0 ? (
+            {activeQueue.length === 0 ? (
                 <div className="hitl-empty">
                     <div className="hitl-empty-icon">
                         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
                     <h3>Queue is Clear</h3>
-                    <p>All requests have been processed. No pending human review required.</p>
+                    <p>All pending {activeTab === "prompts" ? "prompts" : "memory scans"} have been processed. No pending human review required.</p>
                 </div>
             ) : (
                 <div className="hitl-queue">
-                    {queue.map((req) => (
+                    {activeQueue.map((req) => (
                         <HITLCard
                             key={req.id}
                             request={req}
@@ -239,35 +268,37 @@ function HITLPage() {
                     ))}
                 </div>
             )}
+
             {/* Resolved Items */}
-            {answeredItems.length > 0 && (
+            {activeResolved.length > 0 && (
                 <div style={{ marginTop: "2rem" }}>
                     <div className="hitl-queue-header">
-                        <div className="hitl-queue-title">Resolved Requests</div>
+                        <div className="hitl-queue-title">Resolved {activeTab === "prompts" ? "Prompts" : "Memory Scans"}</div>
                     </div>
                     <div className="hitl-queue">
-                        {answeredItems.map((item) => (
+                        {activeResolved.map((item) => (
                             <div key={item.id} className="hitl-card" style={{ opacity: 0.9 }}>
                                 <div className="hitl-card-header">
                                     <div>
-                                        <div className="hitl-card-id">Request #{item.id}</div>
+                                        <div className="hitl-card-id">{item.memory_id ? `Memory Item #${item.memory_id}` : `Request #${item.id}`}</div>
                                         <div className="hitl-card-tags">
                                             <span className={`hitl-tag ${item.status === "approved" ? "severity-low" : "severity-critical"}`}>
                                                 {item.status === "approved" ? "✓ Approved" : "✕ Rejected"}
                                             </span>
                                         </div>
                                     </div>
+                                    <div className="hitl-timestamp">{item.timestamp}</div>
                                 </div>
                                 <div className="hitl-card-body">
                                     {item.prompt && (
                                         <div className="hitl-field">
-                                            <div className="hitl-field-label">User Prompt</div>
+                                            <div className="hitl-field-label">{item.memory_id ? "Memory Fact" : "User Prompt"}</div>
                                             <div className="hitl-field-value prompt-text">{item.prompt}</div>
                                         </div>
                                     )}
                                     <div className="hitl-field">
                                         <div className="hitl-field-label">
-                                            {item.status === "approved" ? "AI Response" : "Security Action"}
+                                            {item.status === "approved" ? (item.memory_id ? "Memory Status" : "AI Response") : "Security Action"}
                                         </div>
                                         <div className="hitl-field-value reason-text">{item.response}</div>
                                     </div>
@@ -278,8 +309,6 @@ function HITLPage() {
                 </div>
             )}
 
-            {/* Toasts */}
-            <div className="hitl-toast-area"></div>
             {/* Toasts */}
             <div className="hitl-toast-area">
                 {toasts.map((t) => (

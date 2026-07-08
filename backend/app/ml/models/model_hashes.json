@@ -1,6 +1,11 @@
 {
-    "svm": "de58254bcfd9f93d84d13c7249f0802ecc6926f9d3cec6fdcf28a52d4c88b447",
-    "xgboost": "43643b8d552b3ad820e670e894a4d8d156f2afe2e8c9c06a4557e4a94269f415",
-    "lightgbm": "73b433d56c912141a84891c8bb23c141ad1b6dc0ac967d806f9a7c34ea17f428",
-    "mlp": "5cfa4dcb4c6487c7b4d59de94782247a992f99f0642db12d6eaaac87177c4c8e"
+    "svm": "707beb42a0f79f3b8b0210eb0cde74549a946fa6af347f20237c5dd8c6cff048",
+    "xgboost": "2509144fed017b9ae628a5ce68d78870a0cecc941ecee4f758fb3f9a1a7571a8",
+    "lightgbm": "2f2ac8adf5ee709fff198e903c773e1d04275bc20c6be054064cc1e11ee12c80",
+    "mlp": "53b6e683d3b2e6dfafdb0eafa4ef24dee5151e1da219122f5e06b455d0ae7153",
+    "random_forest": "2b3d3f97a8808d364e9dbc52e829f1f44e7ff3f1acebdbb73dd68690e81dbea0",
+    "logistic_regression": "d6b0320e4aab1a3d8e4c1774cdb56bbb0e90ea9c921644ab224162f8eccdc170",
+    "transformer_emb": "e344b1a31e498d0c65c26a93f11c5f19e871a3bf2354609da2d15c3ab537cd6b",
+    "cnn_1d": "24a2f4a49ead3ef736faf110fec8a4dc8bf5b6d328a3fe41871d930bd302aead",
+    "adaboost": "dbc08a9570eae7aba47b03c133bb6f533b55fe8cecfe8d2f4f17b3102c1b825a"
 }

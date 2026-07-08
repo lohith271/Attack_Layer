@@ -11,7 +11,12 @@ MODEL_FILES = {
     "svm": "svm.pkl",
     "xgboost": "xgboost.pkl",
     "lightgbm": "lightgbm.pkl",
-    "mlp": "mlp.pth"
+    "mlp": "mlp.pth",
+    "random_forest": "random_forest.pkl",
+    "logistic_regression": "logistic_regression.pkl",
+    "transformer_emb": "transformer_emb.pth",
+    "cnn_1d": "cnn_1d.pth",
+    "adaboost": "adaboost.pkl"
 }
 
 def calculate_sha256(file_path: str) -> str:

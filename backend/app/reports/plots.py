@@ -34,6 +34,11 @@ MODEL_COLORS = {
     "XGBOOST": "#ff7f0e",
     "LIGHTGBM": "#2ca02c",
     "MLP": "#d62728",
+    "RANDOM_FOREST": "#9467bd",
+    "LOGISTIC_REGRESSION": "#8c564b",
+    "TRANSFORMER_EMB": "#e377c2",
+    "CNN_1D": "#17becf",
+    "ADABOOST": "#bcbd22"
 }
 PALETTE = list(MODEL_COLORS.values())
 
@@ -60,6 +65,7 @@ def plot_accuracy_bars(df: pd.DataFrame) -> str:
     ax.set_title("Model Accuracy Comparison")
     ax.set_ylim(max(0, df["Accuracy"].min() - 0.05), 1.02)
     ax.grid(axis="y", alpha=0.3)
+    plt.xticks(rotation=30, ha="right")
     return _save(fig, "accuracy_comparison.png")
 
 
@@ -75,6 +81,7 @@ def plot_f1_bars(df: pd.DataFrame) -> str:
     ax.set_title("Model F1 Score Comparison")
     ax.set_ylim(max(0, df["F1"].min() - 0.05), 1.02)
     ax.grid(axis="y", alpha=0.3)
+    plt.xticks(rotation=30, ha="right")
     return _save(fig, "f1_comparison.png")
 
 

@@ -1,0 +1,505 @@
+/* Model Performance Dashboard Page Styles */
+
+.performance-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    padding: var(--space-2) 0;
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading and Error States */
+.perf-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    gap: var(--space-4);
+}
+
+.perf-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-primary-light);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.perf-error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.perf-error-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    max-width: 450px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.perf-error-card h2 {
+    color: var(--color-danger);
+    margin-bottom: var(--space-3);
+    font-size: 20px;
+}
+
+.perf-error-card p {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-5);
+    line-height: 1.5;
+}
+
+.retry-btn {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 10px 20px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.retry-btn:hover {
+    background: var(--color-primary-hover);
+}
+
+/* Overview Cards */
+.models-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+}
+
+.model-overview-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-base);
+}
+
+.model-overview-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary-light);
+}
+
+.model-overview-card.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary-bg);
+    box-shadow: var(--shadow-md), 0 0 0 2px rgba(30, 64, 175, 0.1);
+}
+
+.overview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+}
+
+.overview-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.status-badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+}
+
+.status-badge.healthy {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
+}
+
+.overview-stats {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    border-top: 1px solid var(--color-border-light);
+    padding-top: var(--space-3);
+}
+
+.overview-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+}
+
+.stat-val {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.model-overview-card.active .stat-val {
+    color: var(--color-primary);
+}
+
+/* Detailed Layout Section */
+.model-details-section {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-md);
+}
+
+.details-card-header {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.details-card-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: var(--space-2);
+}
+
+.details-card-header p {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    margin: 0;
+    max-width: 800px;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.details-col-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.panel-box {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+}
+
+.panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--space-1);
+}
+
+.panel-desc {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-4);
+}
+
+/* Interactive Confusion Matrix Grid */
+.confusion-matrix-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: var(--space-4) 0 var(--space-2) 0;
+}
+
+.cm-y-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin-right: var(--space-4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.cm-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    max-width: 440px;
+}
+
+.cm-headers {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr;
+    gap: 6px;
+    text-align: center;
+}
+
+.cm-header-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    padding: var(--space-1) 0;
+}
+
+.cm-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr;
+    gap: 6px;
+    align-items: center;
+}
+
+.cm-row-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-align: right;
+    padding-right: var(--space-3);
+}
+
+.cm-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 110px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    transition: all var(--transition-base);
+    cursor: help;
+    position: relative;
+}
+
+.cm-cell:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-md);
+    z-index: 10;
+}
+
+.cell-count {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.cell-pct {
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0.85;
+    margin-bottom: var(--space-2);
+}
+
+.cell-label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.8;
+}
+
+/* Diagonal correct styles (Greenish) */
+.cell-tn, .cell-tp {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #065f46;
+}
+
+.cell-tn:hover, .cell-tp:hover {
+    border-color: #34d399;
+    background: #d1fae5;
+}
+
+/* Off-diagonal error styles (Reddish/Orange) */
+.cell-fp, .cell-fn {
+    background: #fff5f5;
+    border-color: #feb2b2;
+    color: #9b2c2c;
+}
+
+.cell-fp:hover, .cell-fn:hover {
+    border-color: #fc8181;
+    background: #fed7d7;
+}
+
+/* Detailed Metric Cards */
+.metrics-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-4);
+}
+
+.metric-card {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: var(--transition-base);
+}
+
+.metric-card:hover {
+    border-color: var(--color-primary-light);
+    transform: translateY(-1px);
+}
+
+.metric-icon {
+    font-size: 20px;
+    margin-bottom: 2px;
+}
+
+.metric-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-primary-light);
+}
+
+.metric-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.metric-info {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    margin-top: var(--space-1);
+}
+
+.metric-card.danger .metric-num {
+    color: var(--color-danger);
+}
+
+.metric-card.info .metric-num {
+    color: var(--color-info);
+}
+
+/* Right Column plots */
+.explainability-plot-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    min-height: 380px;
+    box-shadow: var(--shadow-sm);
+}
+
+.explainability-image {
+    max-width: 100%;
+    max-height: 480px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* Global Visualizations Dashboard */
+.global-visualizations-section {
+    margin-top: var(--space-4);
+}
+
+.global-visualizations-section h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 4px;
+}
+
+.global-visualizations-section p {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-5);
+}
+
+.global-plots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: var(--space-6);
+}
+
+@media (max-width: 600px) {
+    .global-plots-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.global-plot-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.global-plot-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+}
+
+.global-plot-card p {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 0 0 var(--space-2) 0;
+    line-height: 1.4;
+}
+
+.plot-img-container {
+    background: white;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 280px;
+}
+
+.plot-img-container img {
+    max-width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+    border-radius: 4px;
+}

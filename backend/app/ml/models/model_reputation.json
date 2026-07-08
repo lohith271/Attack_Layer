@@ -1,34 +1,74 @@
 {
     "svm": {
-        "weight": 0.21000000000000002,
-        "agreement_rate": 0.6,
-        "total_predictions": 5,
-        "agreement_count": 3,
-        "confidence_sum": 4.232453521402652,
+        "weight": 0.19989338072936053,
+        "agreement_rate": 1.0,
+        "total_predictions": 357,
+        "agreement_count": 357,
+        "confidence_sum": 298.96517755390994,
         "historical_accuracy": 1.0
     },
     "xgboost": {
-        "weight": 0.2633333333333333,
-        "agreement_rate": 1.0,
-        "total_predictions": 5,
-        "agreement_count": 5,
-        "confidence_sum": 4.152441937053356,
+        "weight": 0.10000042399841054,
+        "agreement_rate": 0.834733893557423,
+        "total_predictions": 357,
+        "agreement_count": 298,
+        "confidence_sum": 296.1685796768611,
         "historical_accuracy": 1.0
     },
     "lightgbm": {
-        "weight": 0.2633333333333333,
-        "agreement_rate": 1.0,
-        "total_predictions": 5,
-        "agreement_count": 5,
-        "confidence_sum": 4.233214960002707,
+        "weight": 0.1000003698262968,
+        "agreement_rate": 0.834733893557423,
+        "total_predictions": 357,
+        "agreement_count": 298,
+        "confidence_sum": 304.2115343404265,
         "historical_accuracy": 1.0
     },
     "mlp": {
-        "weight": 0.2633333333333333,
-        "agreement_rate": 1.0,
-        "total_predictions": 5,
-        "agreement_count": 5,
-        "confidence_sum": 4.520581781864166,
+        "weight": 0.1,
+        "agreement_rate": 0.8375350140056023,
+        "total_predictions": 357,
+        "agreement_count": 299,
+        "confidence_sum": 306.4426437616348,
+        "historical_accuracy": 1.0
+    },
+    "random_forest": {
+        "weight": 0.10000225512922588,
+        "agreement_rate": 0.9187675070028011,
+        "total_predictions": 357,
+        "agreement_count": 328,
+        "confidence_sum": 252.36570700123326,
+        "historical_accuracy": 1.0
+    },
+    "logistic_regression": {
+        "weight": 0.10000160723529598,
+        "agreement_rate": 0.9215686274509803,
+        "total_predictions": 357,
+        "agreement_count": 329,
+        "confidence_sum": 294.3769817473664,
+        "historical_accuracy": 1.0
+    },
+    "transformer_emb": {
+        "weight": 0.10000031766919472,
+        "agreement_rate": 0.7591036414565826,
+        "total_predictions": 357,
+        "agreement_count": 271,
+        "confidence_sum": 335.3247749209404,
+        "historical_accuracy": 1.0
+    },
+    "cnn_1d": {
+        "weight": 0.10000029478795373,
+        "agreement_rate": 0.8291316526610645,
+        "total_predictions": 357,
+        "agreement_count": 296,
+        "confidence_sum": 354.9934900999069,
+        "historical_accuracy": 1.0
+    },
+    "adaboost": {
+        "weight": 0.10000135062426194,
+        "agreement_rate": 0.8431372549019608,
+        "total_predictions": 357,
+        "agreement_count": 301,
+        "confidence_sum": 255.44016187459766,
         "historical_accuracy": 1.0
     }
 }

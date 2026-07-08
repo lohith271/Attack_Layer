@@ -38,10 +38,12 @@ def generate_shap_explanation(X_sample: np.ndarray, model_name: str) -> dict:
         shap_values = explainer.shap_values(X_sample)
         
         # For binary classification, shap_values can be a list [class0_values, class1_values]
-        # or a single 2D array. Let's handle both.
+        # or a 3D numpy array (samples, features, classes), or a 2D array.
         if isinstance(shap_values, list):
             # Take values for class 1 (attack)
             shap_val = shap_values[1]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_val = shap_values[:, :, 1]
         else:
             shap_val = shap_values
             
@@ -88,6 +90,8 @@ def save_shap_summary_plot(X_test: np.ndarray, model_name: str, max_display: int
         
         if isinstance(shap_values, list):
             shap_val = shap_values[1]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_val = shap_values[:, :, 1]
         else:
             shap_val = shap_values
             

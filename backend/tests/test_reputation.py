@@ -32,7 +32,7 @@ class TestLoadSave:
 
         data = mr.load_reputation()
         assert "svm" in data
-        assert data["svm"]["weight"] == 0.25
+        assert abs(data["svm"]["weight"] - 0.1111) < 1e-4
         assert os.path.exists(rep_file)
 
     def test_save_and_reload(self, fresh_reputation):
@@ -53,7 +53,7 @@ class TestGetWeights:
         import app.ml.model_reputation as mr
 
         w = mr.get_weights()
-        assert len(w) == 4
+        assert len(w) == 9
         assert abs(sum(w.values()) - 1.0) < 1e-9
 
     def test_weights_subset(self, fresh_reputation):
@@ -124,5 +124,5 @@ class TestResetReputation:
         mr.reset_reputation()
 
         data = mr.load_reputation()
-        assert data["xgboost"]["weight"] == 0.25
+        assert abs(data["xgboost"]["weight"] - 0.1111) < 1e-4
         assert data["xgboost"]["total_predictions"] == 0

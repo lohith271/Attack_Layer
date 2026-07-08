@@ -141,3 +141,42 @@ def clear_short_term(db: Session = Depends(get_db)):
 def clear_long_term(db: Session = Depends(get_db)):
     count = clear_long_term_memories(db)
     return {"status": "success", "cleared_count": count}
+
+
+@router.post("/refresh/{memory_id}")
+def refresh_single(memory_id: int, db: Session = Depends(get_db)):
+    from app.memory.vault import refresh_memory
+    from app.audit.logger import log_security_event
+    result = refresh_memory(db, memory_id)
+    if result:
+        log_security_event(
+            db=db,
+            operation="REFRESH_ACTION",
+            decision="ALLOW",
+            threat="NONE",
+            risk_score=0.0,
+            payload=f"Refreshed memory {memory_id}",
+            final_decision="ALLOW"
+        )
+    if not result:
+        return {"status": "not_found", "memory_id": memory_id}
+    return result
+
+
+@router.post("/refresh-type/{memory_type}")
+def refresh_by_type(memory_type: str, db: Session = Depends(get_db)):
+    from app.memory.vault import refresh_memories_by_type
+    from app.audit.logger import log_security_event
+    mtype = memory_type.upper().replace("-", "_")
+    result = refresh_memories_by_type(db, mtype)
+    log_security_event(
+        db=db,
+        operation="REFRESH_ACTION",
+        decision="ALLOW",
+        threat="NONE",
+        risk_score=0.0,
+        payload=f"Refreshed memory type {mtype}",
+        final_decision="ALLOW"
+    )
+    return result
+

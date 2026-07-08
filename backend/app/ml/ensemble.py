@@ -12,7 +12,7 @@ def predict_model_single(model_name: str, model_instance, embedding: np.ndarray)
     # Ensure 2D input for models
     X = embedding.reshape(1, -1)
     
-    if model_name == "mlp":
+    if model_name in ["mlp", "transformer_emb", "cnn_1d"]:
         # PyTorch model
         with torch.no_grad():
             tensor_input = torch.FloatTensor(X)

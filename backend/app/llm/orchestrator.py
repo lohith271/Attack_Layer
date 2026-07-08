@@ -209,6 +209,16 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             memories_used = ranked_memories
 
         # Log the event with ALLOW_WITH_WARNING final decision
+        explanation = security_result.get("explanation") or {}
+        if isinstance(explanation, str):
+            try:
+                explanation = json.loads(explanation)
+            except Exception:
+                explanation = {"reason": explanation}
+        else:
+            explanation = dict(explanation)
+        explanation["user_id"] = user_id
+
         hitl_event = log_security_event(
             db=db,
             operation=operation,
@@ -229,7 +239,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             trust_scores=[m.get("trust_score") for m in memories_used],
             execution_time_ms=elapsed,
             final_decision="ALLOW_WITH_WARNING",  # Explicitly set for HITL queue
-            explanation=security_result.get("explanation"),
+            explanation=explanation,
             ip_address=ip_address,
         )
 
@@ -279,6 +289,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
         validation = validate_response(
             llm_response,
             message,
+            memories_used=memories_used,
             security_result=security_result,
         )
 
@@ -293,6 +304,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             validation = validate_response(
                 llm_response,
                 message,
+                memories_used=memories_used,
                 security_result=security_result,
             )
             validation["regenerated"] = True

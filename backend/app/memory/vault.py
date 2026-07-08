@@ -891,3 +891,199 @@ def clear_long_term_memories(db: Session):
         count += 1
     db.commit()
     return count
+
+
+def refresh_memory(db: Session, memory_id: int):
+    memory = (
+        db.query(Memory)
+        .filter(Memory.id == memory_id)
+        .first()
+    )
+    if not memory:
+        return None
+
+    # Re-evaluate safety
+    security_result = evaluate_security(memory.fact, db=db, user_id=memory.user_id)
+    
+    # ML Decision Layer
+    embedding = generate_embedding(memory.fact)
+    decision_output = predict_decision(embedding)
+    ml_prediction = decision_output["prediction"]
+    ml_confidence = decision_output["confidence"]
+    ml_decision = map_decision(ml_prediction, ml_confidence)
+
+    # Determine if the memory fact contains an attack
+    is_attack = False
+    if (
+        security_result["decision"] == "BLOCK"
+        or security_result["attack_type"] != "SAFE"
+        or ml_decision == "BLOCK"
+    ):
+        is_attack = True
+
+    if is_attack:
+        # Remove from vector storage
+        remove_memory_embedding(memory.id)
+        
+        # Deactivate in the database and mark status
+        memory.active = False
+        memory.status = "WAITING_APPROVAL"
+        memory.final_decision = "ALLOW_WITH_WARNING"
+        memory.poison_flag = True
+        memory.attack_type = security_result.get("attack_type") or "ML_ATTACK"
+        
+        from app.audit.logger import log_security_event
+        log_security_event(
+            db=db,
+            operation="REFRESH_SCAN",
+            decision="ALLOW_WITH_WARNING",
+            threat=security_result.get("attack_type") or "ML_ATTACK",
+            risk_score=security_result.get("risk_score", 0.9),
+            payload=memory.fact,
+            final_decision="ALLOW_WITH_WARNING",
+            explanation={
+                "security_result": {"decision": "BLOCK"},
+                "reason": "Attack detected during memory refresh scan"
+            },
+            memory_id=memory.id,
+            ip_address=None
+        )
+        db.commit()
+        db.refresh(memory)
+        return {
+            "status": "sent_to_approval",
+            "memory_id": memory_id,
+            "fact": memory.fact,
+            "attack_type": security_result.get("attack_type") or "ML_ATTACK",
+            "decision": "ALLOW_WITH_WARNING"
+        }
+    else:
+        # It's safe, keep it and update details
+        memory.attack_type = security_result["attack_type"]
+        memory.final_decision = security_result["decision"]
+        memory.poison_score = security_result.get("risk_score", memory.poison_score)
+        
+        from app.audit.logger import log_security_event
+        log_security_event(
+            db=db,
+            operation="REFRESH_SCAN",
+            decision="ALLOW",
+            threat="SAFE",
+            risk_score=security_result.get("risk_score", 0.0),
+            payload=memory.fact,
+            final_decision="ALLOW",
+            explanation={
+                "security_result": {"decision": "ALLOW"},
+                "reason": "Verified safe during memory refresh scan"
+            },
+            memory_id=memory.id,
+            ip_address=None
+        )
+        db.commit()
+        db.refresh(memory)
+        return {
+            "status": "safe",
+            "memory_id": memory_id,
+            "fact": memory.fact,
+            "attack_type": memory.attack_type,
+            "decision": memory.final_decision
+        }
+
+
+def refresh_memories_by_type(db: Session, memory_type: str):
+    memories = (
+        db.query(Memory)
+        .filter(Memory.memory_type == memory_type)
+        .all()
+    )
+    
+    removed = []
+    safe = []
+    
+    for memory in memories:
+        # Re-evaluate safety
+        security_result = evaluate_security(memory.fact, db=db, user_id=memory.user_id)
+        
+        # ML Decision Layer
+        embedding = generate_embedding(memory.fact)
+        decision_output = predict_decision(embedding)
+        ml_prediction = decision_output["prediction"]
+        ml_confidence = decision_output["confidence"]
+        ml_decision = map_decision(ml_prediction, ml_confidence)
+
+        is_attack = False
+        if (
+            security_result["decision"] == "BLOCK"
+            or security_result["attack_type"] != "SAFE"
+            or ml_decision == "BLOCK"
+        ):
+            is_attack = True
+
+        if is_attack:
+            # Send to human approval & remove from memory
+            remove_memory_embedding(memory.id)
+            memory.active = False
+            memory.status = "WAITING_APPROVAL"
+            memory.final_decision = "ALLOW_WITH_WARNING"
+            memory.poison_flag = True
+            memory.attack_type = security_result.get("attack_type") or "ML_ATTACK"
+            
+            from app.audit.logger import log_security_event
+            log_security_event(
+                db=db,
+                operation="REFRESH_SCAN",
+                decision="ALLOW_WITH_WARNING",
+                threat=security_result.get("attack_type") or "ML_ATTACK",
+                risk_score=security_result.get("risk_score", 0.9),
+                payload=memory.fact,
+                final_decision="ALLOW_WITH_WARNING",
+                explanation={
+                    "security_result": {"decision": "BLOCK"},
+                    "reason": f"Attack detected during batch {memory_type} memory refresh scan"
+                },
+                memory_id=memory.id,
+                ip_address=None
+            )
+            removed.append({
+                "id": memory.id,
+                "fact": memory.fact,
+                "attack_type": security_result.get("attack_type") or "ML_ATTACK"
+            })
+        else:
+            memory.attack_type = security_result["attack_type"]
+            memory.final_decision = security_result["decision"]
+            memory.poison_score = security_result.get("risk_score", memory.poison_score)
+            
+            from app.audit.logger import log_security_event
+            log_security_event(
+                db=db,
+                operation="REFRESH_SCAN",
+                decision="ALLOW",
+                threat="SAFE",
+                risk_score=security_result.get("risk_score", 0.0),
+                payload=memory.fact,
+                final_decision="ALLOW",
+                explanation={
+                    "security_result": {"decision": "ALLOW"},
+                    "reason": f"Verified safe during batch {memory_type} memory refresh scan"
+                },
+                memory_id=memory.id,
+                ip_address=None
+            )
+            safe.append({
+                "id": memory.id,
+                "fact": memory.fact,
+                "attack_type": memory.attack_type
+            })
+            
+    db.commit()
+    return {
+        "status": "success",
+        "memory_type": memory_type,
+        "total_checked": len(memories),
+        "removed_count": len(removed),
+        "removed_memories": removed,
+        "safe_count": len(safe)
+    }
+
+

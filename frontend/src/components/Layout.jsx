@@ -49,6 +49,27 @@ const navItems = [
             </svg>
         ),
     },
+    {
+        to: "/model-performance",
+        label: "Model Performance",
+        icon: (
+            <svg viewBox="0 0 24 24">
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                <path d="M22 12A10 10 0 0 0 12 2v10z" />
+            </svg>
+        ),
+    },
+    {
+        to: "/agent-investigator",
+        label: "Agent Investigator",
+        icon: (
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+            </svg>
+        ),
+    },
 ];
 
 function Layout({ children }) {

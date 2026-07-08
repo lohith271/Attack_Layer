@@ -20,7 +20,7 @@ os.makedirs(FIGURES_DIR, exist_ok=True)
 
 def evaluate_model_metrics(model_name: str, model, X_test, y_test):
     """Evaluate a single model on test data and return all metrics."""
-    if model_name == "mlp":
+    if model_name in ["mlp", "transformer_emb", "cnn_1d"]:
         with torch.no_grad():
             tensor_input = torch.FloatTensor(X_test)
             logits = model(tensor_input)
@@ -102,7 +102,7 @@ def main():
     X_train, X_val, X_test, y_train, y_val, y_test = load_split_data()
     print(f"Loaded dataset splits. Test set size: {X_test.shape[0]} samples.")
     
-    models = ["svm", "xgboost", "lightgbm", "mlp"]
+    models = ["svm", "xgboost", "lightgbm", "mlp", "random_forest", "logistic_regression", "transformer_emb", "cnn_1d", "adaboost"]
     results = []
     
     for model_name in models:
@@ -127,7 +127,7 @@ def main():
         print(f"Saved confusion matrix for {model_name} to {cm_path}")
         
         # 2. Save SHAP Summary plots for tree-based models
-        if model_name in ("xgboost", "lightgbm"):
+        if model_name in ("xgboost", "lightgbm", "random_forest"):
             print(f"Generating SHAP plots for {model_name}...")
             # Use a subsample of 100 test samples to keep speed reasonable
             subsample_size = min(100, X_test.shape[0])
@@ -146,9 +146,8 @@ def main():
     print("\nBenchmark Evaluation Results:")
     print(df_results.to_string(index=False))
     
-    # 3. Save Accuracy Comparison Bar Chart
-    plt.figure(figsize=(8, 5))
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+    plt.figure(figsize=(10, 5))
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#17becf', '#bcbd22']
     plt.bar(df_results['Model'], df_results['Accuracy'], color=colors[:len(df_results)])
     plt.ylabel('Accuracy')
     plt.title('Model Accuracy Comparison')
@@ -156,13 +155,14 @@ def main():
     for i, val in enumerate(df_results['Accuracy']):
         plt.text(i, val + 0.005, f"{val:.4f}", ha='center', va='bottom', fontweight='bold')
     acc_chart_path = os.path.join(FIGURES_DIR, "accuracy_comparison.png")
+    plt.xticks(rotation=30, ha='right')
     plt.tight_layout()
     plt.savefig(acc_chart_path, dpi=150)
     plt.close()
     print(f"Saved accuracy comparison bar chart to {acc_chart_path}")
     
     # 4. Save F1 Comparison Bar Chart
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(10, 5))
     plt.bar(df_results['Model'], df_results['F1'], color=colors[:len(df_results)])
     plt.ylabel('F1 Score')
     plt.title('Model F1 Score Comparison')
@@ -170,6 +170,7 @@ def main():
     for i, val in enumerate(df_results['F1']):
         plt.text(i, val + 0.005, f"{val:.4f}", ha='center', va='bottom', fontweight='bold')
     f1_chart_path = os.path.join(FIGURES_DIR, "f1_comparison.png")
+    plt.xticks(rotation=30, ha='right')
     plt.tight_layout()
     plt.savefig(f1_chart_path, dpi=150)
     plt.close()

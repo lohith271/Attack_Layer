@@ -51,7 +51,8 @@ def get_hitl_queue(db: Session = Depends(get_db)):
             "severity": event.risk_level if event.risk_level else "LOW",
             "detection_reason": explanation.get("security_result", {}).get("decision", "UNKNOWN"),
             "timestamp": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "human_decision": explanation.get("human_decision")
+            "human_decision": explanation.get("human_decision"),
+            "memory_id": event.memory_id
         })
 
     return result
@@ -82,14 +83,42 @@ def approve_hitl_request(request_id: int, db: Session = Depends(get_db)):
             
     explanation["human_decision"] = "APPROVED"
     explanation["human_decision_timestamp"] = datetime.utcnow().isoformat()
+
+    final_response = "Got it. I've updated your memory."
+    if not event.memory_id:
+        # Generate response using Ollama and secure context
+        from app.llm.orchestrator import _should_use_personal_context
+        from app.memory.retrieval import retrieve_memories
+        from app.security.context_builder import build_secure_context
+        from app.llm.service import generate_response
+
+        message = event.payload
+        user_id = explanation.get("user_id", "default")
+        
+        secure_context = ""
+        if _should_use_personal_context(message):
+            retrieval_result = retrieve_memories(
+                db=db,
+                user_id=user_id,
+                query=message,
+            )
+            ranked_memories = retrieval_result.get("ranked_memories", [])
+            secure_context = build_secure_context(
+                query=message,
+                safe_memories=retrieval_result["safe_memories"],
+                ranked_memories=ranked_memories,
+            )
+
+        llm_response = generate_response(query=message, secure_context=secure_context)
+        final_response = llm_response
+
+    explanation["human_decision_response"] = final_response
     event.explanation = json.dumps(explanation)
 
     # ------------------------
     # Activate pending memory
     # ------------------------
-
     if event.memory_id:
-
         memory = (
             db.query(Memory)
             .filter(
@@ -99,33 +128,19 @@ def approve_hitl_request(request_id: int, db: Session = Depends(get_db)):
         )
 
         if memory:
-
             memory.active = True
-
             memory.status = "ACTIVE"
-
             embedding = generate_embedding(
                 memory.fact
             )
-
             add_memory_embedding(
-
                 memory.id,
-
                 memory.fact,
-
                 embedding
-
             )
 
     db.commit()
     db.refresh(event)
-
-    final_response = "Got it. I've updated your memory."
-    if event.memory_id:
-        memory = db.query(Memory).filter(Memory.id == event.memory_id).first()
-        if not memory or memory.status != "ACTIVE":
-            final_response = "Got it. I've updated your memory."
 
     return {"status": "approved", "request_id": request_id, "response": final_response}
 
@@ -223,14 +238,15 @@ def get_hitl_status(
 
     if human_decision == "APPROVED":
         if event.memory_id:
-            response = "✓ Approved. Your memory has been saved and is now active."
+            response = f"✓ Request #{request_id} Approved. Your memory has been saved and is now active."
         else:
-            response = "✓ Your request was approved by a human reviewer and has been processed."
+            ollama_resp = explanation.get("human_decision_response") or "Your request was approved by a human reviewer and has been processed."
+            response = f"✓ Request #{request_id} Approved:\n{ollama_resp}"
     else:
         if event.memory_id:
-            response = "⚠ Rejected. The memory update was blocked by human review."
+            response = f"⚠ Request #{request_id} Rejected. The memory update was blocked by human review."
         else:
-            response = "⚠ Your request was reviewed and rejected by a human reviewer. It has been blocked."
+            response = f"⚠ Request #{request_id} Rejected. Your request was reviewed and rejected by a human reviewer. It has been blocked."
 
     return {
         "resolved": True,
@@ -271,6 +287,7 @@ def get_resolved_hitl_items(db: Session = Depends(get_db)):
             "response": "Got it. I've updated your memory." if human_decision == "APPROVED"
                         else "Request rejected and blocked by security policy.",
             "timestamp": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "memory_id": event.memory_id
         })
 
     return result

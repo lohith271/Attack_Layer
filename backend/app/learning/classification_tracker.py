@@ -17,7 +17,7 @@ def record_classification(
     is_false_positive = (
         was_blocked
         and predicted_label != "SAFE"
-        and not user_corrected
+        and user_corrected
     )
     is_false_negative = (
         not was_blocked

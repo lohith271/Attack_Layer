@@ -78,6 +78,16 @@ export async function clearLongTermMemory() {
     return response.data;
 }
 
+export async function refreshMemory(memoryId) {
+    const response = await API.post(`/memory/refresh/${memoryId}`);
+    return response.data;
+}
+
+export async function refreshMemoryType(memoryType) {
+    const response = await API.post(`/memory/refresh-type/${memoryType}`);
+    return response.data;
+}
+
 export const getHitlStatus = async (requestId) => {
     const response = await API.get(`/hitl/status/${requestId}`);
     return response.data;
@@ -99,6 +109,11 @@ function normalizeAttackStats(raw) {
         trustScoreAverage: raw.trust_score_average ?? raw.average_trust_score ?? 0,
         falsePositiveRate: raw.false_positive_rate ?? 0,
         falseNegativeRate: raw.false_negative_rate ?? 0,
+        detectionRate: raw.detection_rate ?? 0,
+        poisoningSuccessRate: raw.poisoning_success_rate ?? 0,
+        memoryContaminationRate: raw.memory_contamination_rate ?? 0,
+        recoveryRate: raw.recovery_rate ?? 0,
+        attackClassificationAccuracy: raw.attack_classification_accuracy ?? 0,
     };
 }
 
@@ -267,3 +282,22 @@ export async function clearDatabases() {
     const response = await API.delete("/admin/databases");
     return response.data;
 }
+
+/* ===== BENCHMARKS ===== */
+export async function getModelBenchmarks() {
+    const response = await API.get("/evaluation/model-benchmarks");
+    return response.data;
+}
+
+export async function queryAgentInvestigator(query) {
+    const response = await API.post("/audit/explain-query", null, {
+        params: { query },
+    });
+    return response.data;
+}
+
+export async function getMemoryRefreshStats() {
+    const response = await API.get("/audit/memory-refresh-stats");
+    return response.data;
+}
+

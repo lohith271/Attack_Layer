@@ -100,7 +100,14 @@ def compute_classification_metrics(db):
         1
         for e in audits
         if e.attack_type not in ("SAFE", "NONE", None)
-        and e.poison_detected
+        and (e.decision in ("BLOCK", "ALLOW_WITH_WARNING") or e.poison_detected)
+    )
+
+    detected_poison_attacks = sum(
+        1
+        for e in audits
+        if e.attack_type == "MEMORY_POISONING"
+        and (e.decision in ("BLOCK", "ALLOW_WITH_WARNING") or e.poison_detected)
     )
 
     successful_poison_attacks = sum(
@@ -141,8 +148,8 @@ def compute_classification_metrics(db):
 
     recovery_rate = _safe_divide(
         recovered_memories,
-        detected_attacks
-    )
+        detected_poison_attacks
+    ) if detected_poison_attacks > 0 else 1.0
 
     defense_effectiveness = round(
         1 - poisoning_success_rate,

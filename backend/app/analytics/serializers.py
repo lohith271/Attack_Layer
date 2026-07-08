@@ -33,7 +33,7 @@ def serialize_audit_event(event: AuditEvent) -> dict:
 
     return {
         "id": event.id,
-        "time": event.created_at.strftime("%H:%M:%S"),
+        "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "prompt": event.payload,
         "operation": event.operation,
         "threat": event.threat if event.threat else "NONE",

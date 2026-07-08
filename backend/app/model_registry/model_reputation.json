@@ -1,0 +1,34 @@
+{
+    "svm": {
+        "weight": 0.21000000000000002,
+        "agreement_rate": 0.6,
+        "total_predictions": 5,
+        "agreement_count": 3,
+        "confidence_sum": 4.232453521402652,
+        "historical_accuracy": 1.0
+    },
+    "xgboost": {
+        "weight": 0.2633333333333333,
+        "agreement_rate": 1.0,
+        "total_predictions": 5,
+        "agreement_count": 5,
+        "confidence_sum": 4.152441937053356,
+        "historical_accuracy": 1.0
+    },
+    "lightgbm": {
+        "weight": 0.2633333333333333,
+        "agreement_rate": 1.0,
+        "total_predictions": 5,
+        "agreement_count": 5,
+        "confidence_sum": 4.233214960002707,
+        "historical_accuracy": 1.0
+    },
+    "mlp": {
+        "weight": 0.2633333333333333,
+        "agreement_rate": 1.0,
+        "total_predictions": 5,
+        "agreement_count": 5,
+        "confidence_sum": 4.520581781864166,
+        "historical_accuracy": 1.0
+    }
+}

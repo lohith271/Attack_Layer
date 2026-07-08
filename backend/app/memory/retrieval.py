@@ -146,7 +146,7 @@ def retrieve_memories(
     ranked.sort(key=lambda x: x["scores"]["final_score"], reverse=True)
     ranked_memories = [item["memory"] for item in ranked[:top_k * 2]]
 
-    security_result = filter_memories(ranked_memories, query)
+    security_result = filter_memories(ranked_memories, query, db=db, user_id=user_id)
 
     allowed = security_result["allowed_memories"]
     allowed_ranked = sorted(

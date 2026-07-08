@@ -30,7 +30,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "ml", "models")
 # Local backup folder for self-healing; could be swapped for a remote URL
 REGISTRY_DIR = os.path.join(BASE_DIR, "model_registry")
 
-ALL_MODEL_NAMES = ["svm", "xgboost", "lightgbm", "mlp"]
+ALL_MODEL_NAMES = ["svm", "xgboost", "lightgbm", "mlp", "random_forest", "logistic_regression", "transformer_emb", "cnn_1d", "adaboost"]
 
 
 # ── SimpleMLP definition (must match train_mlp.py) ──────────────────────
@@ -55,6 +55,73 @@ class SimpleMLP(torch.nn.Module):
         return self.network(x)
 
 
+class TransformerClassifier(torch.nn.Module):
+    """Lightweight Transformer classifier for embeddings."""
+
+    def __init__(self, input_dim: int = 768, seq_len: int = 8, d_model: int = 64, nhead: int = 4, num_layers: int = 2, hidden_dim: int = 64, dropout_rate: float = 0.3):
+        super().__init__()
+        self.seq_len = seq_len
+        self.d_model = d_model
+        self.projection = torch.nn.Linear(input_dim, seq_len * d_model)
+        
+        encoder_layer = torch.nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=hidden_dim,
+            dropout=dropout_rate,
+            batch_first=True
+        )
+        self.transformer_encoder = torch.nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers
+        )
+        
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(seq_len * d_model, hidden_dim),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(dropout_rate),
+            torch.nn.Linear(hidden_dim, 2)
+        )
+        
+    def forward(self, x):
+        projected = self.projection(x)
+        seq = projected.view(-1, self.seq_len, self.d_model)
+        out = self.transformer_encoder(seq)
+        out_flat = out.reshape(-1, self.seq_len * self.d_model)
+        logits = self.fc(out_flat)
+        return logits
+
+
+class CNN1DClassifier(torch.nn.Module):
+    """Lightweight 1D CNN classifier for embeddings."""
+
+    def __init__(self, input_dim: int = 768, hidden_dim: int = 64, dropout_rate: float = 0.3):
+        super().__init__()
+        self.conv1 = torch.nn.Conv1d(in_channels=1, out_channels=16, kernel_size=5, stride=2, padding=2)
+        self.bn1 = torch.nn.BatchNorm1d(16)
+        self.pool = torch.nn.MaxPool1d(kernel_size=2, stride=2)
+        
+        self.conv2 = torch.nn.Conv1d(in_channels=16, out_channels=32, kernel_size=5, stride=2, padding=2)
+        self.bn2 = torch.nn.BatchNorm1d(32)
+        
+        # 768 -> conv1 (stride 2) -> 384 -> pool (stride 2) -> 192 -> conv2 (stride 2) -> 96 -> pool (stride 2) -> 48
+        # Output shape: 32 channels * 48 = 1536
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(32 * 48, hidden_dim),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(dropout_rate),
+            torch.nn.Linear(hidden_dim, 2)
+        )
+        
+    def forward(self, x):
+        x = x.unsqueeze(1) # (batch_size, 1, input_dim)
+        x = self.pool(torch.nn.functional.relu(self.bn1(self.conv1(x))))
+        x = self.pool(torch.nn.functional.relu(self.bn2(self.conv2(x))))
+        x = x.view(x.size(0), -1)
+        logits = self.fc(x)
+        return logits
+
+
 # ── Internal model cache ────────────────────────────────────────────────
 _model_cache: Dict[str, object] = {}
 
@@ -63,17 +130,33 @@ _model_cache: Dict[str, object] = {}
 def _load_single_model(model_name: str):
     """Deserialize one model from disk and return the instance."""
     if model_name == "mlp":
-        # MLP is saved as a state_dict (.pth)
         pth_path = os.path.join(MODELS_DIR, "mlp.pth")
         pt_path = os.path.join(MODELS_DIR, "mlp.pt")
         path = pth_path if os.path.exists(pth_path) else pt_path
         if not os.path.exists(path):
             raise FileNotFoundError(f"MLP model file not found at {pth_path} or {pt_path}")
         state = torch.load(path, map_location="cpu")
-        # Infer input dim from the first Linear layer weight
         first_weight = next(iter(state.values()))
         input_dim = first_weight.shape[1]
         model = SimpleMLP(input_dim=input_dim)
+        model.load_state_dict(state)
+        model.eval()
+        return model
+    elif model_name == "transformer_emb":
+        pth_path = os.path.join(MODELS_DIR, "transformer_emb.pth")
+        if not os.path.exists(pth_path):
+            raise FileNotFoundError(f"Transformer model file not found at {pth_path}")
+        state = torch.load(pth_path, map_location="cpu")
+        model = TransformerClassifier()
+        model.load_state_dict(state)
+        model.eval()
+        return model
+    elif model_name == "cnn_1d":
+        pth_path = os.path.join(MODELS_DIR, "cnn_1d.pth")
+        if not os.path.exists(pth_path):
+            raise FileNotFoundError(f"1D CNN model file not found at {pth_path}")
+        state = torch.load(pth_path, map_location="cpu")
+        model = CNN1DClassifier()
         model.load_state_dict(state)
         model.eval()
         return model
@@ -86,7 +169,7 @@ def _load_single_model(model_name: str):
 
 def _try_restore_from_backup(model_name: str):
     """Copy the backup model over the primary and reload."""
-    ext = "pth" if model_name == "mlp" else "pkl"
+    ext = "pth" if model_name in ["mlp", "transformer_emb", "cnn_1d"] else "pkl"
     backup_path = os.path.join(REGISTRY_DIR, f"{model_name}.{ext}")
     if not os.path.exists(backup_path):
         raise FileNotFoundError(
@@ -97,7 +180,6 @@ def _try_restore_from_backup(model_name: str):
     with open(backup_path, "rb") as src, open(dest_path, "wb") as dst:
         dst.write(src.read())
     logger.info("Restored %s from registry backup.", model_name)
-    # After restore, regenerate hashes so future checks pass
     generate_model_hashes()
     return _load_single_model(model_name)
 

@@ -5,6 +5,8 @@ import DashboardPage from "./pages/DashboardPage";
 import MemoryVaultPage from "./pages/MemoryVaultPage";
 import HITLPage from "./pages/HITLPage";
 import ThreatAnalysisPage from "./pages/ThreatAnalysisPage";
+import ModelPerformancePage from "./pages/ModelPerformancePage";
+import AgentInvestigatorPage from "./pages/AgentInvestigatorPage";
 import "./App.css";
 
 function App() {
@@ -48,6 +50,22 @@ function App() {
                 element={
                     <Layout>
                         <ThreatAnalysisPage />
+                    </Layout>
+                }
+            />
+            <Route
+                path="/model-performance"
+                element={
+                    <Layout>
+                        <ModelPerformancePage />
+                    </Layout>
+                }
+            />
+            <Route
+                path="/agent-investigator"
+                element={
+                    <Layout>
+                        <AgentInvestigatorPage />
                     </Layout>
                 }
             />

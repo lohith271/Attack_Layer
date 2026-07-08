@@ -6,7 +6,7 @@ REPUTATION_FILE = os.path.join(BASE_DIR, "ml", "models", "model_reputation.json"
 
 DEFAULT_REPUTATION = {
     "svm": {
-        "weight": 0.25,
+        "weight": 0.1111,
         "agreement_rate": 1.0,
         "total_predictions": 0,
         "agreement_count": 0,
@@ -14,7 +14,7 @@ DEFAULT_REPUTATION = {
         "historical_accuracy": 1.0
     },
     "xgboost": {
-        "weight": 0.25,
+        "weight": 0.1111,
         "agreement_rate": 1.0,
         "total_predictions": 0,
         "agreement_count": 0,
@@ -22,7 +22,7 @@ DEFAULT_REPUTATION = {
         "historical_accuracy": 1.0
     },
     "lightgbm": {
-        "weight": 0.25,
+        "weight": 0.1111,
         "agreement_rate": 1.0,
         "total_predictions": 0,
         "agreement_count": 0,
@@ -30,7 +30,47 @@ DEFAULT_REPUTATION = {
         "historical_accuracy": 1.0
     },
     "mlp": {
-        "weight": 0.25,
+        "weight": 0.1111,
+        "agreement_rate": 1.0,
+        "total_predictions": 0,
+        "agreement_count": 0,
+        "confidence_sum": 0.0,
+        "historical_accuracy": 1.0
+    },
+    "random_forest": {
+        "weight": 0.1111,
+        "agreement_rate": 1.0,
+        "total_predictions": 0,
+        "agreement_count": 0,
+        "confidence_sum": 0.0,
+        "historical_accuracy": 1.0
+    },
+    "logistic_regression": {
+        "weight": 0.1111,
+        "agreement_rate": 1.0,
+        "total_predictions": 0,
+        "agreement_count": 0,
+        "confidence_sum": 0.0,
+        "historical_accuracy": 1.0
+    },
+    "transformer_emb": {
+        "weight": 0.1111,
+        "agreement_rate": 1.0,
+        "total_predictions": 0,
+        "agreement_count": 0,
+        "confidence_sum": 0.0,
+        "historical_accuracy": 1.0
+    },
+    "cnn_1d": {
+        "weight": 0.1111,
+        "agreement_rate": 1.0,
+        "total_predictions": 0,
+        "agreement_count": 0,
+        "confidence_sum": 0.0,
+        "historical_accuracy": 1.0
+    },
+    "adaboost": {
+        "weight": 0.1111,
         "agreement_rate": 1.0,
         "total_predictions": 0,
         "agreement_count": 0,

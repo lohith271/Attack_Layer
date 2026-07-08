@@ -271,6 +271,45 @@ function ThreatAnalysisPage() {
                 ))}
             </div>
 
+            {/* ===== SECURITY INTEGRITY & RESEARCH METRICS ===== */}
+            <div className="research-metrics-section" style={{ marginBottom: "32px" }}>
+                <h2 style={{ fontSize: "14px", fontWeight: "700", color: "var(--color-text)", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    🔬 Security Integrity & Research Metrics
+                </h2>
+                <div className="research-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+                    <div className="ta-kpi-card" style={{ borderLeft: "4px solid #10b981" }}>
+                        <div className="ta-kpi-value">{((stats.detectionRate || 0) * 100).toFixed(2)}%</div>
+                        <div className="ta-kpi-label">Detection Rate (DR)</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>Proportion of attacks successfully identified</div>
+                    </div>
+                    <div className="ta-kpi-card" style={{ borderLeft: "4px solid #ef4444" }}>
+                        <div className="ta-kpi-value">{((stats.poisoningSuccessRate || 0) * 100).toFixed(2)}%</div>
+                        <div className="ta-kpi-label">Poisoning Success Rate (PSR)</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>Proportion of attacks that bypassed defenses</div>
+                    </div>
+                    <div className="ta-kpi-card" style={{ borderLeft: "4px solid #f59e0b" }}>
+                        <div className="ta-kpi-value">{((stats.memoryContaminationRate || 0) * 100).toFixed(2)}%</div>
+                        <div className="ta-kpi-label">Memory Contamination Rate (MCR)</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>Fraction of memories affected by poisoning</div>
+                    </div>
+                    <div className="ta-kpi-card" style={{ borderLeft: "4px solid #3b82f6" }}>
+                        <div className="ta-kpi-value">{((stats.recoveryRate || 0) * 100).toFixed(2)}%</div>
+                        <div className="ta-kpi-label">Recovery Rate (RR)</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>Tampered model files auto-healed</div>
+                    </div>
+                    <div className="ta-kpi-card" style={{ borderLeft: "4px solid #8b5cf6" }}>
+                        <div className="ta-kpi-value">{((stats.attackClassificationAccuracy || 0) * 100).toFixed(2)}%</div>
+                        <div className="ta-kpi-label">Reasoning Accuracy (RA)</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>Correct classification of security logic</div>
+                    </div>
+                    <div className="ta-kpi-card" style={{ borderLeft: "4px solid #6b7280" }}>
+                        <div className="ta-kpi-value">{((stats.falsePositiveRate || 0) * 100).toFixed(2)}%</div>
+                        <div className="ta-kpi-label">False Positive Rate (FPR)</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>Clean queries incorrectly blocked</div>
+                    </div>
+                </div>
+            </div>
+
             {/* ===== CHARTS ===== */}
             <div className="ta-charts-grid">
                 {/* Attack Trend */}

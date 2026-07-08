@@ -216,3 +216,52 @@ def attack_severity_breakdown(db: Session = Depends(get_db)):
 @router.get("/ip-intelligence")
 def ip_intelligence(db: Session = Depends(get_db)):
     return get_ip_intelligence(db)
+
+
+@router.post("/explain-query")
+def explain_query(query: str, db: Session = Depends(get_db)):
+    from app.agents import orchestrator
+    return orchestrator.analytics_agent.explain_query(db, query)
+
+
+@router.get("/memory-refresh-stats")
+def get_memory_refresh_stats(db: Session = Depends(get_db)):
+    from datetime import datetime
+    from app.database.models import Memory
+    
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    refreshes_today = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.operation == "REFRESH_ACTION",
+            AuditEvent.created_at >= today_start
+        )
+        .count()
+    )
+    
+    detected_today = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.operation == "REFRESH_SCAN",
+            AuditEvent.decision == "ALLOW_WITH_WARNING",
+            AuditEvent.created_at >= today_start
+        )
+        .count()
+    )
+    
+    pending_reviews_count = (
+        db.query(Memory)
+        .filter(
+            Memory.active == False,
+            Memory.status == "WAITING_APPROVAL"
+        )
+        .count()
+    )
+    
+    return {
+        "refreshes_today": refreshes_today,
+        "detected_today": detected_today,
+        "pending_reviews_count": pending_reviews_count
+    }
+

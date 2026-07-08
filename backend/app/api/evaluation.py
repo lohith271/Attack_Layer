@@ -31,3 +31,24 @@ def get_research_metrics(
     db: Session = Depends(get_db)
 ):
     return compute_classification_metrics(db)
+
+
+@router.get("/model-benchmarks")
+def get_model_benchmarks():
+    import os
+    import pandas as pd
+    from fastapi import HTTPException
+    
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    metrics_path = os.path.join(base_dir, "reports", "metrics_table.csv")
+    
+    if not os.path.exists(metrics_path):
+        raise HTTPException(status_code=404, detail="Benchmark metrics table not found. Run benchmark_models.py first.")
+        
+    try:
+        df = pd.read_csv(metrics_path)
+        # Convert to dictionary (list of records)
+        records = df.to_dict(orient="records")
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load metrics: {str(e)}")

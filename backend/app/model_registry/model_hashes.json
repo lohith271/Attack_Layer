@@ -1,0 +1,8 @@
+{
+    "svm": "6feb380abde29212ae385682c8741a9129f0039ea288a8b680bf873f9d23bd4b",
+    "xgboost": "a3bf4d18127f6aed25fdee7f6b45f5c63e08f85cddf74b9566a4c8fd8334621e",
+    "lightgbm": "0862acad4e470e7d7cf0d76fe99a9f3de727ec164f40fa8c1cc7e9785c5a7557",
+    "mlp": "9d86b8d87dbff8210b7c1c90c5866c1e7e3ef191a22e2521a57aa4455b0a1661",
+    "random_forest": "fe89eb8eae5137aea03f5fa8432511cff325d012710f333aab214d860dba0de7",
+    "logistic_regression": "4074adaac1151586a10869d294c983f3a5389bce925f53c36e0c24d30ca4dd9e"
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getAuditEvents } from "../api/attacklayer";
+import { getAuditEvents, getMemoryRefreshStats } from "../api/attacklayer";
 import { useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
 
@@ -91,6 +91,11 @@ function DashboardPage() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [refreshStats, setRefreshStats] = useState({
+        refreshes_today: 0,
+        detected_today: 0,
+        pending_reviews_count: 0
+    });
 
     useEffect(() => {
         load();
@@ -103,6 +108,14 @@ function DashboardPage() {
             const data = await getAuditEvents();
             setEvents(data);
             localStorage.setItem("attacklayer_dashboard_events", JSON.stringify(data));
+            
+            try {
+                const stats = await getMemoryRefreshStats();
+                setRefreshStats(stats);
+            } catch (statsErr) {
+                console.error("Failed to load memory refresh stats:", statsErr);
+            }
+            
             setError("");
         } catch {
             // Backend down — keep showing cached data, just show a soft warning
@@ -249,6 +262,34 @@ function DashboardPage() {
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* Memory Scan & Approval Summary */}
+            <div className="audit-section" style={{ marginTop: '2rem' }}>
+                <div className="audit-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <h2 style={{ margin: 0 }}>Memory Security Scan Summary</h2>
+                        <div className="live-badge" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)' }}>
+                            <span className="live-dot" style={{ backgroundColor: 'var(--color-primary)' }} />
+                            Active
+                        </div>
+                    </div>
+                </div>
+
+                <div className="kpi-grid" style={{ marginTop: '20px' }}>
+                    <div className="kpi-card" style={{ padding: '20px', marginBottom: 0 }}>
+                        <div className="kpi-value">{refreshStats.refreshes_today}</div>
+                        <div className="kpi-label">Refreshes Happened Today</div>
+                    </div>
+                    <div className="kpi-card block" style={{ padding: '20px', marginBottom: 0 }}>
+                        <div className="kpi-value" style={{ color: 'var(--color-danger)' }}>{refreshStats.detected_today}</div>
+                        <div className="kpi-label">Detected Attacks Today</div>
+                    </div>
+                    <div className="kpi-card warning" style={{ padding: '20px', marginBottom: 0 }}>
+                        <div className="kpi-value" style={{ color: 'var(--color-warning)' }}>{refreshStats.pending_reviews_count}</div>
+                        <div className="kpi-label">Memories Waiting Human Approval</div>
+                    </div>
                 </div>
             </div>
         </>

@@ -409,3 +409,34 @@
     flex-direction: column;
   }
 }
+
+/* HITL Tabs Styling */
+.hitl-tabs-container {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+}
+
+.hitl-tab-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.hitl-tab-btn:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+
+.hitl-tab-btn.active {
+  color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
