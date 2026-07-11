@@ -1,0 +1,14 @@
+.venv
+venv
+__pycache__
+*.pyc
+*.db
+*.sqlite3
+chroma_db/
+models/
+reports/
+figures/
+.pytest_cache
+tests/
+.git
+.gitignore

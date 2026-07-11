@@ -50,7 +50,7 @@ def get_hitl_queue(db: Session = Depends(get_db)):
             "threat_type": event.threat if event.threat else "NONE",
             "severity": event.risk_level if event.risk_level else "LOW",
             "detection_reason": explanation.get("security_result", {}).get("decision", "UNKNOWN"),
-            "timestamp": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "human_decision": explanation.get("human_decision"),
             "memory_id": event.memory_id
         })
@@ -286,7 +286,7 @@ def get_resolved_hitl_items(db: Session = Depends(get_db)):
             "status": "approved" if human_decision == "APPROVED" else "rejected",
             "response": "Got it. I've updated your memory." if human_decision == "APPROVED"
                         else "Request rejected and blocked by security policy.",
-            "timestamp": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "memory_id": event.memory_id
         })
 

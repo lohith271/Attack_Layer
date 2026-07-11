@@ -17,7 +17,7 @@ def get_ip_intelligence(db):
     ip_data = []
     for ip, events in ip_groups.items():
         request_count = len(events)
-        last_seen = max(event.created_at for event in events) if events else None
+        last_seen = max(event.created_at for event in events if event.created_at) if events else None
 
         # Determine threat type: pick the threat with highest risk score (non-SAFE if possible)
         threat_type = "NONE"
@@ -114,7 +114,7 @@ def get_blocked_events(db):
 
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%H:%M:%S"),
+            "time": event.created_at.strftime("%H:%M:%S") if event.created_at else "Unknown",
             "prompt": event.payload,
             "operation": event.operation,
             "threat": event.threat if event.threat else "NONE",
@@ -187,7 +187,7 @@ def get_threat_events(db):
 
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%H:%M:%S"),
+            "time": event.created_at.strftime("%H:%M:%S") if event.created_at else "Unknown",
             "prompt": event.payload,
             "operation": event.operation,
             "threat": event.threat if event.threat else "NONE",
@@ -260,7 +260,7 @@ def get_conflict_events(db):
 
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%H:%M:%S"),
+            "time": event.created_at.strftime("%H:%M:%S") if event.created_at else "Unknown",
             "prompt": event.payload,
             "operation": event.operation,
             "threat": event.threat if event.threat else "NONE",
@@ -368,7 +368,7 @@ def get_security_timeline(db):
     for event in events:
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "operation": event.operation,
             "threat": event.threat if event.threat else "NONE",
             "risk_score": round(event.risk_score, 4),
@@ -538,7 +538,7 @@ def get_preference_timeline(db):
     for event in events:
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "user_id": event.user_id,
             "old_fact": event.old_fact[:50] + "..." if len(event.old_fact) > 50 else event.old_fact,
             "new_fact": event.new_fact[:50] + "..." if len(event.new_fact) > 50 else event.new_fact,
@@ -614,7 +614,7 @@ def get_tool_policy_violations(db):
     for event in events:
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "user_id": event.user_id,
             "policy_text": event.policy_text[:100] + "..." if len(event.policy_text) > 100 else event.policy_text,
             "violation_reason": event.violation_reason,
@@ -663,7 +663,7 @@ def get_tool_policy_timeline(db):
     for event in events:
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "user_id": event.user_id,
             "policy_text": event.policy_text[:50] + "..." if len(event.policy_text) > 50 else event.policy_text,
             "violation_reason": event.violation_reason,
@@ -719,7 +719,7 @@ def get_propagation_timeline(db):
     for event in events:
         result.append({
             "id": event.id,
-            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "time": event.created_at.strftime("%Y-%m-%d %H:%M:%S") if event.created_at else "Unknown",
             "memory_id": event.memory_id,
             "origin_agent": event.origin_agent,
             "target_agent": event.target_agent,
@@ -754,8 +754,9 @@ def get_attack_trend_over_time(db):
     buckets = {}
 
     for event in events:
-        key = event.created_at.strftime("%Y-%m-%d")
-        buckets[key] = buckets.get(key, 0) + 1
+        if event.created_at:
+            key = event.created_at.strftime("%Y-%m-%d")
+            buckets[key] = buckets.get(key, 0) + 1
 
     result = [
         {"date": key, "count": buckets[key]}

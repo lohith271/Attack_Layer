@@ -34,6 +34,19 @@ function AgentInvestigatorPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, loading]);
 
+    function handleDownloadReport(text, reportDate) {
+        const filename = `Security_Today_Report_${reportDate || new Date().toISOString().split('T')[0]}.md`;
+        const blob = new Blob([text], { type: "text/markdown;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
     async function handleSend(e) {
         e.preventDefault();
         const queryText = input.trim();
@@ -53,6 +66,8 @@ function AgentInvestigatorPage() {
                     sender: "agent",
                     text: data.response,
                     stats: data.stats,
+                    is_today_report: data.is_today_report,
+                    report_date: data.report_date,
                 },
             ]);
         } catch (err) {
@@ -183,6 +198,41 @@ function AgentInvestigatorPage() {
                                     <div style={{ whiteSpace: "pre-line", fontSize: "14px", lineHeight: "1.6" }}>
                                         {msg.text}
                                     </div>
+
+                                    {/* Download button for today report */}
+                                    {!isUser && msg.is_today_report && (
+                                        <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid var(--color-border)" }}>
+                                            <button
+                                                onClick={() => handleDownloadReport(msg.text, msg.report_date)}
+                                                style={{
+                                                    padding: "6px 14px",
+                                                    background: "var(--color-primary-bg)",
+                                                    border: "1px solid var(--color-primary-light)",
+                                                    borderRadius: "var(--radius-sm)",
+                                                    color: "var(--color-primary)",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600",
+                                                    cursor: "pointer",
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                    gap: "6px",
+                                                    boxShadow: "var(--shadow-sm)",
+                                                    transition: "all var(--transition-fast)"
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = "var(--color-primary-bg-hover)";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "var(--color-primary-bg)";
+                                                }}
+                                            >
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                                                </svg>
+                                                Download Today Report (.md)
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Agent Stats Section */}
                                     {!isUser && msg.stats && (

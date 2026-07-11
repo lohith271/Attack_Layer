@@ -127,10 +127,10 @@ function DashboardPage() {
         }
     }
 
-    function exportToExcel() {
-        if (!events.length) return;
+    function exportToExcel(eventList = events, filenamePrefix = "attacklayer_audit") {
+        if (!eventList.length) return;
         const headers = ["ID", "Time", "Prompt", "Decision", "Threat Type", "Risk Score", "Execution Time (ms)", "Quarantine Status", "Conflict Status"];
-        const rows = events.map(e => [
+        const rows = eventList.map(e => [
             e.id,
             `"${e.time || new Date(e.timestamp || Date.now()).toLocaleTimeString()}"`,
             `"${(e.prompt || "").replace(/"/g, '""')}"`,
@@ -146,7 +146,7 @@ function DashboardPage() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `attacklayer_audit_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `${filenamePrefix}_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -160,6 +160,14 @@ function DashboardPage() {
         approved: events.filter((e) => e.explanation?.human_decision === "APPROVED").length,
         rejected: events.filter((e) => e.explanation?.human_decision === "REJECTED").length,
     };
+
+    // Filter events into chat prompts vs memory checking
+    const chatEvents = events.filter(
+        (e) => e.operation !== "REFRESH_ACTION" && e.operation !== "REFRESH_SCAN"
+    );
+    const memoryEvents = events.filter(
+        (e) => e.operation === "REFRESH_ACTION" || e.operation === "REFRESH_SCAN"
+    );
 
     if (loading) {
         return (
@@ -211,7 +219,7 @@ function DashboardPage() {
                             Live
                         </div>
                     </div>
-                    <button onClick={exportToExcel} style={{ padding: '6px 12px', background: 'white', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text)' }}>
+                    <button onClick={() => exportToExcel(chatEvents, "attacklayer_chat_audit")} style={{ padding: '6px 12px', background: 'white', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text)' }}>
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Export to Excel (CSV)
                     </button>
@@ -229,7 +237,7 @@ function DashboardPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {events.slice(0, 10).map((event) => (
+                            {chatEvents.slice(0, 10).map((event) => (
                                 <tr key={event.id}>
                                     <td style={{ whiteSpace: "nowrap", color: "var(--color-text-muted)", fontSize: 12 }}>
                                         {event.time || new Date(event.timestamp || Date.now()).toLocaleTimeString()}
@@ -253,7 +261,7 @@ function DashboardPage() {
                                     </td>
                                 </tr>
                             ))}
-                            {events.length === 0 && (
+                            {chatEvents.length === 0 && (
                                 <tr>
                                     <td colSpan={6} style={{ textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
                                         No audit events recorded yet
@@ -290,6 +298,70 @@ function DashboardPage() {
                         <div className="kpi-value" style={{ color: 'var(--color-warning)' }}>{refreshStats.pending_reviews_count}</div>
                         <div className="kpi-label">Memories Waiting Human Approval</div>
                     </div>
+                </div>
+            </div>
+
+            {/* Memory Audit Logs */}
+            <div className="audit-section" style={{ marginTop: '2rem' }}>
+                <div className="audit-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <h2 style={{ margin: 0 }}>Memory Security Scan & Refresh Logs</h2>
+                        <div className="live-badge">
+                            <span className="live-dot" />
+                            Live
+                        </div>
+                    </div>
+                    <button onClick={() => exportToExcel(memoryEvents, "attacklayer_memory_audit")} style={{ padding: '6px 12px', background: 'white', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text)' }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export to Excel (CSV)
+                    </button>
+                </div>
+                <div className="audit-table-wrap">
+                    <table className="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Memory / Prompt</th>
+                                <th>Decision</th>
+                                <th>Threat Type</th>
+                                <th>Risk Score</th>
+                                <th>Execution Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {memoryEvents.slice(0, 10).map((event) => (
+                                <tr key={event.id}>
+                                    <td style={{ whiteSpace: "nowrap", color: "var(--color-text-muted)", fontSize: 12 }}>
+                                        {event.time || new Date(event.timestamp || Date.now()).toLocaleTimeString()}
+                                    </td>
+                                    <td>
+                                        <div className="audit-prompt" title={event.prompt}>
+                                            {event.prompt || "—"}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <DecisionBadge decision={event.final_decision} />
+                                    </td>
+                                    <td style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                        {event.threat || "—"}
+                                    </td>
+                                    <td className="audit-risk" style={{ color: event.risk_score > 0.7 ? "var(--color-danger)" : event.risk_score > 0.4 ? "var(--color-warning)" : "var(--color-success)" }}>
+                                        {(event.risk_score || 0).toFixed(2)}
+                                    </td>
+                                    <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                                        {event.execution_time_ms ? `${event.execution_time_ms}ms` : "—"}
+                                    </td>
+                                </tr>
+                            ))}
+                            {memoryEvents.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} style={{ textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
+                                        No memory scan/refresh events recorded yet
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </>

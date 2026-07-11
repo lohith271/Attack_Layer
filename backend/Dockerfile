@@ -11,7 +11,12 @@ WORKDIR /app
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# 1. Install CPU-only version of PyTorch first to save ~2.4 GB of download size
+RUN pip install --no-cache-dir --default-timeout=1000 torch --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install the rest of the packages (pip will see torch is already satisfied and skip it)
+RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
 # Copy the rest of the backend files
 COPY . .

@@ -168,16 +168,57 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             "I can't retain sensitive credentials or secret information."
         )
 
-        if security_result.get("attack_type") == "TOOL_MANIPULATION":
+        attack_type = security_result.get("attack_type")
+        sensitive_type = security_result.get("sensitive_type")
+
+        if sensitive_type and sensitive_type != "NONE":
+            block_response = (
+                "I can't retain sensitive credentials or secret information."
+            )
+        elif attack_type == "TOOL_MANIPULATION":
             block_response = (
                 "⚠ Unsafe tool policy blocked.\n\n"
                 "Reason: TOOL_MANIPULATION"
             )
-
-        if security_result.get("attack_type") == "PROMPT_INJECTION":
+        elif attack_type == "PROMPT_INJECTION":
             block_response = (
                 "⚠ Request blocked.\n\n"
                 "Reason: Prompt injection detected."
+            )
+        elif attack_type == "FALSE_FACT_INJECTION":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: False fact injection detected."
+            )
+        elif attack_type == "MEMORY_POISONING":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: Memory poisoning detected."
+            )
+        elif attack_type == "MEMORY_OVERWRITE":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: Memory overwrite detected."
+            )
+        elif attack_type == "PROPAGATION_ATTACK":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: Propagation attack detected."
+            )
+        elif attack_type == "ROLE_HIJACK":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: Role hijacking detected."
+            )
+        elif attack_type == "PREFERENCE_MANIPULATION":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: Preference manipulation detected."
+            )
+        elif attack_type == "SYSTEM_PROMPT_EXTRACTION":
+            block_response = (
+                "⚠ Request blocked.\n\n"
+                "Reason: System prompt extraction detected."
             )
 
         return {

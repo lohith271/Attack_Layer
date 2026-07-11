@@ -98,7 +98,7 @@ def history(memory_id: int, db: Session = Depends(get_db)):
             "category": item.category,
             "old_version": item.old_version,
             "new_version": item.new_version,
-            "time": item.created_at.strftime("%H:%M:%S"),
+            "time": item.created_at.strftime("%H:%M:%S") if item.created_at else "Unknown",
         }
         for item in history_items
     ]
@@ -119,7 +119,7 @@ def full_history(db: Session = Depends(get_db)):
             "category": item.category,
             "old_version": item.old_version,
             "new_version": item.new_version,
-            "time": item.created_at.strftime("%H:%M:%S"),
+            "time": item.created_at.strftime("%H:%M:%S") if item.created_at else "Unknown",
         }
         for item in records
     ]

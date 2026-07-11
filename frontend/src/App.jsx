@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Layout from "./components/Layout";
 import ChatPage from "./pages/ChatPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -10,6 +11,41 @@ import AgentInvestigatorPage from "./pages/AgentInvestigatorPage";
 import "./App.css";
 
 function App() {
+    const location = useLocation();
+
+    useEffect(() => {
+        const path = location.pathname;
+        let title = "AttackLayer";
+
+        switch (path) {
+            case "/chat":
+                title = "Chat - AttackLayer";
+                break;
+            case "/dashboard":
+                title = "SOC Dashboard - AttackLayer";
+                break;
+            case "/memory-vault":
+                title = "Memory Vault - AttackLayer";
+                break;
+            case "/hitl":
+                title = "Human Review Center - AttackLayer";
+                break;
+            case "/threat-analysis":
+                title = "Threat Analysis & Intelligence - AttackLayer";
+                break;
+            case "/model-performance":
+                title = "Model Performance - AttackLayer";
+                break;
+            case "/agent-investigator":
+                title = "Agent Investigator - AttackLayer";
+                break;
+            default:
+                title = "AttackLayer";
+        }
+
+        document.title = title;
+    }, [location]);
+
     return (
         <Routes>
             <Route path="/" element={<Navigate to="/chat" replace />} />

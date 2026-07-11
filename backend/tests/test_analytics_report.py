@@ -44,6 +44,7 @@ class ThreatAnalyticsAgentReportTest(unittest.TestCase):
             created_at=datetime.utcnow()
         )
         self.db.add_all([mem1, mem2])
+        self.db.commit()
         
         # 2. Add some audit events (including a human reviewed one today)
         event1 = models.AuditEvent(
@@ -68,7 +69,9 @@ class ThreatAnalyticsAgentReportTest(unittest.TestCase):
             risk_score=0.2,
             payload="i love apples",
             explanation=json.dumps(explanation_approved),
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            ip_address="172.20.233.58",
+            memory_id=mem2.id
         )
         
         # Human decision rejected today
@@ -84,7 +87,8 @@ class ThreatAnalyticsAgentReportTest(unittest.TestCase):
             risk_score=0.8,
             payload="remember a bad fact",
             explanation=json.dumps(explanation_rejected),
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            ip_address="172.20.233.58"
         )
         
         # Pending review today
@@ -95,7 +99,8 @@ class ThreatAnalyticsAgentReportTest(unittest.TestCase):
             threat="TOOL_POLICY_MANIPULATION",
             risk_score=0.7,
             payload="disable validation",
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            ip_address="127.0.0.1"
         )
         
         self.db.add_all([event1, event2, event3, event4])
@@ -107,24 +112,65 @@ class ThreatAnalyticsAgentReportTest(unittest.TestCase):
         stats = res["stats"]
         
         # Verification
-        self.assertIn("=== MEMORY VAULT ===", response_text)
-        self.assertIn("Memories Currently in Database (Total: 2)", response_text)
-        self.assertIn("i prefer python coding", response_text)
-        self.assertIn("i love apples", response_text)
+        self.assertIn("🛡️ DAILY SECURITY AUDIT REPORT", response_text)
+        self.assertIn("=== USER & PROMPT AUDITS ===", response_text)
+        self.assertIn("Allowed Requests Today (1):", response_text)
+        self.assertIn("Prompt: \"i love apples\"", response_text)
+        self.assertIn("Source IP: 172.20.233.58", response_text)
+        self.assertIn("Blocked Requests Today (1):", response_text)
+        self.assertIn("Prompt: \"remember a bad fact\"", response_text)
+        self.assertIn("Source IP: 172.20.233.58", response_text)
         
-        self.assertIn("Memories Inserted Today (Total: 1)", response_text)
-        self.assertIn("=== METRICS VALUES & MODEL PERFORMANCE ===", response_text)
-        
-        self.assertIn("=== MODEL ENSEMBLE WEIGHTS ===", response_text)
-        
-        self.assertIn("=== HUMAN REVIEWS ===", response_text)
-        self.assertIn("Pending Review Queue: 1", response_text)
-        self.assertIn("Human Reviews Resolved Today: Yes", response_text)
+        self.assertIn("=== MEMORY SECURITY REFRESHES ===", response_text)
+        self.assertIn("=== HUMAN-IN-THE-LOOP (HITL) REVIEWS ===", response_text)
+        self.assertIn("Pending Human Reviews for Memory: Not yet come", response_text)
         self.assertIn("Approved Today: 1", response_text)
         self.assertIn("Rejected Today: 1", response_text)
+        self.assertIn("Detailed Human Reviews Resolved Today (2):", response_text)
+        self.assertIn("Prompt: \"i love apples\" | Decision: APPROVED | Source IP: 172.20.233.58", response_text)
+        self.assertIn("Prompt: \"remember a bad fact\" | Decision: REJECTED | Source IP: 172.20.233.58", response_text)
+        
+        self.assertIn("=== NEW MEMORY INSERTIONS TODAY ===", response_text)
+        self.assertIn("Fact: \"i love apples\" | Category: FOOD_PREFERENCE | Source IP: 172.20.233.58", response_text)
+        
+        self.assertIn("=== IP INTELLIGENCE & THREAT SUMMARY ===", response_text)
+        self.assertIn("Source IP: 172.20.233.58", response_text)
+        self.assertIn("Source IP: 127.0.0.1", response_text)
+        self.assertIn("Trust Level: Yes", response_text) # For 127.0.0.1 (low risk score)
+        self.assertIn("Trust Level: No (Blocked)", response_text) # For 172.20.233.58 (contains block)
         
         # Today's stats should only count events from today (event2, event3, event4)
         self.assertEqual(stats["total"], 3)
         self.assertEqual(stats["allowed"], 1)
         self.assertEqual(stats["blocked"], 1)
         self.assertEqual(stats["warnings"], 1)
+
+    def test_explain_query_refreshes(self):
+        # Add some refresh events today
+        ref_event = models.AuditEvent(
+            operation="REFRESH_ACTION",
+            decision="ALLOW",
+            threat="SAFE",
+            risk_score=0.0,
+            payload="fact",
+            created_at=datetime.utcnow()
+        )
+        det_event = models.AuditEvent(
+            operation="REFRESH_SCAN",
+            decision="ALLOW_WITH_WARNING",
+            threat="ML_ATTACK",
+            risk_score=0.8,
+            payload="malicious fact",
+            created_at=datetime.utcnow()
+        )
+        self.db.add_all([ref_event, det_event])
+        self.db.commit()
+
+        # Query number of refreshes today
+        res = self.agent.explain_query(self.db, "Give the no of refreshes happened today")
+        response_text = res["response"]
+        
+        self.assertIn("Memory Refreshes for today:", response_text)
+        self.assertIn("- Refreshes Triggered: 1", response_text)
+        self.assertIn("- Refreshes Detected as Attacks (Blocked/Quarantined): 1", response_text)
+
