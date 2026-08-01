@@ -83,6 +83,11 @@ def calculate_defense_in_depth_score(
         0.15 * human_threat
     )
     
+    # If One-Class SVM detected an out-of-distribution anomaly, automatically elevate
+    # the threat score to force a BLOCK or QUARANTINE decision.
+    if ml_res.get("one_class_anomaly"):
+        threat_score = max(threat_score, 0.85)
+        
     # Make a defense-in-depth final decision based on the composite score
     # Thresholds:
     # >= 0.75: BLOCK

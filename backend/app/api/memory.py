@@ -31,6 +31,7 @@ def _serialize_memory(memory):
 
     return {
         "id": memory.id,
+        "unique_id": getattr(memory, "unique_id", None),
         "user_id": memory.user_id,
         "fact": memory.fact,
         "category": memory.category,

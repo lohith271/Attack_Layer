@@ -20,9 +20,22 @@ class MemoryRefreshTest(unittest.TestCase):
         vault.add_memory_embedding = lambda *args, **kwargs: None
         vault.remove_memory_embedding = lambda *args, **kwargs: None
 
+        from unittest.mock import patch, MagicMock
+        self.patcher_model = patch("app.ml.predict_decision.get_model")
+        self.mock_get_model = self.patcher_model.start()
+        from app.ml.model_manager import get_model as real_get_model
+        def side_effect(name):
+            if name == "one_class_svm":
+                mock_svm = MagicMock()
+                mock_svm.predict.return_value = [1]
+                return mock_svm
+            return real_get_model(name)
+        self.mock_get_model.side_effect = side_effect
+
     def tearDown(self):
         vault.add_memory_embedding = self.original_add
         vault.remove_memory_embedding = self.original_remove
+        self.patcher_model.stop()
         self.db.close()
 
     def test_refresh_safe_memory(self):

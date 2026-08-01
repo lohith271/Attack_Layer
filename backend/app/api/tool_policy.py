@@ -74,3 +74,39 @@ def compare_policies(
         old_policy,
         new_policy
     )
+
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.database.session import get_db
+from app.memory_security.services.tool_policy_event_logger import log_tool_policy_event
+
+@router.post("/execute")
+def execute_tool(
+    tool_name: str,
+    parameters: dict,
+    user_id: str = "default_user",
+    original_user_prompt: str = None,
+    db: Session = Depends(get_db)
+):
+    result = ToolPolicyValidator.validate_tool_execution(
+        db=db,
+        tool_name=tool_name,
+        parameters=parameters,
+        user_id=user_id,
+        original_user_prompt=original_user_prompt
+    )
+
+    if result["decision"] == "BLOCK":
+        log_tool_policy_event(
+            db=db,
+            user_id=user_id,
+            policy_text=f"Execution of tool {tool_name} with params {parameters}",
+            violation_reason=result["violation_reason"],
+            risk_score=result["risk_score"],
+            decision="BLOCK",
+            unapproved_domains=",".join(result["unapproved_domains"])
+        )
+
+    return result
+

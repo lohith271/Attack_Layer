@@ -33,10 +33,10 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val, input_dim):
     print("Training PyTorch MLP on CPU...")
     device = torch.device("cpu")
     
-    # Hyperparameters to use (can be pre-tuned or simple early stopping)
+    # Use CPU explicitly
     batch_size = 64
     learning_rate = 0.005
-    epochs = 100
+    epochs = 10
     
     train_dataset = TensorDataset(torch.FloatTensor(X_train), torch.LongTensor(y_train))
     val_dataset = TensorDataset(torch.FloatTensor(X_val), torch.LongTensor(y_val))
@@ -46,7 +46,8 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val, input_dim):
     model = PyTorchMLP(input_dim=input_dim).to(device)
     # Binary Cross Entropy or Cross Entropy Loss
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    # Increase weight decay from 1e-4 to 1e-3 for better L2 regularization/bounds
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-3)
     
     best_val_loss = float('inf')
     patience = 10
@@ -58,8 +59,12 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val, input_dim):
         train_loss = 0.0
         for batch_x, batch_y in train_loader:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+            # Inject adversarial Gaussian noise during training for adversarial training
+            noise = torch.randn_like(batch_x) * 0.05
+            batch_x_noisy = batch_x + noise
+            
             optimizer.zero_grad()
-            outputs = model(batch_x)
+            outputs = model(batch_x_noisy)
             loss = criterion(outputs, batch_y)
             loss.backward()
             optimizer.step()
@@ -94,24 +99,31 @@ def train_pytorch_mlp(X_train, y_train, X_val, y_val, input_dim):
     return model
 
 def main():
-    print("--- Training MLP Models ---")
+    print("--- Training MLP Models (Hardened) ---")
     X_train, X_val, X_test, y_train, y_val, y_test = load_split_data()
     
+    # Augment training data with adversarial Gaussian noise to smooth boundary
+    np.random.seed(42)
+    noise_np = np.random.normal(0, 0.03, X_train.shape)
+    X_train_aug = np.vstack([X_train, X_train + noise_np])
+    y_train_aug = np.hstack([y_train, y_train])
+    
     # 1. Scikit-learn MLP Classifier
-    print("Tuning Scikit-learn MLPClassifier...")
-    param_grid = {
-        'hidden_layer_sizes': [(64,), (128,), (128, 64)],
-        'alpha': [0.0001, 0.001, 0.01],
-        'batch_size': [32, 64]
-    }
-    mlp_sk = MLPClassifier(random_state=42, max_iter=200, early_stopping=True)
-    grid = GridSearchCV(mlp_sk, param_grid, cv=5, scoring='f1')
-    grid.fit(X_train, y_train)
-    print(f"Best MLPClassifier parameters: {grid.best_params_}")
+    print("Fitting Scikit-learn MLPClassifier directly...")
+    # Train directly with robust regularized default parameters
+    best_estimator = MLPClassifier(
+        hidden_layer_sizes=(128, 64),
+        alpha=0.01,
+        batch_size=64,
+        random_state=42,
+        max_iter=200,
+        early_stopping=True
+    )
+    best_estimator.fit(X_train_aug, y_train_aug)
     
     print("Calibrating MLPClassifier...")
-    calibrated_mlp_sk = CalibratedClassifierCV(estimator=grid.best_estimator_, cv=5)
-    calibrated_mlp_sk.fit(X_train, y_train)
+    calibrated_mlp_sk = CalibratedClassifierCV(estimator=best_estimator, cv=5)
+    calibrated_mlp_sk.fit(X_train_aug, y_train_aug)
     
     # 2. PyTorch MLP
     pytorch_mlp = train_pytorch_mlp(X_train, y_train, X_val, y_val, X_train.shape[1])

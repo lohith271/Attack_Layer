@@ -14,6 +14,11 @@ MEMORY_COLUMNS = {
     "status": "VARCHAR DEFAULT 'ACTIVE'",
     "memory_type": "VARCHAR DEFAULT 'LONG_TERM'",
     "trust_explanation": "VARCHAR DEFAULT ''",
+    "unique_id": "VARCHAR DEFAULT ''",
+}
+
+QUARANTINE_COLUMNS = {
+    "unique_id": "VARCHAR DEFAULT ''",
 }
 
 AUDIT_COLUMNS = {
@@ -69,7 +74,40 @@ def _correct_classification_stats_logic():
         )
 
 
+def _backfill_unique_ids():
+    import hashlib
+    import uuid
+    with engine.begin() as conn:
+        # Backfill memories table
+        rows = conn.execute(text("SELECT id, user_id, fact, created_at, unique_id FROM memories")).fetchall()
+        for row in rows:
+            m_id, user_id, fact, created_at, unique_id = row
+            if not unique_id or unique_id == "":
+                created_str = str(created_at) if created_at else str(uuid.uuid4())
+                unique_id_str = f"{user_id}:{fact}:{created_str}:{uuid.uuid4()}"
+                new_unique_id = hashlib.sha256(unique_id_str.encode('utf-8')).hexdigest()
+                conn.execute(
+                    text("UPDATE memories SET unique_id = :val WHERE id = :id"),
+                    {"val": new_unique_id, "id": m_id}
+                )
+
+        # Backfill quarantine_memories table
+        rows_q = conn.execute(text("SELECT id, user_id, fact, created_at, unique_id FROM quarantine_memories")).fetchall()
+        for row in rows_q:
+            q_id, user_id, fact, created_at, unique_id = row
+            if not unique_id or unique_id == "":
+                created_str = str(created_at) if created_at else str(uuid.uuid4())
+                unique_id_str = f"{user_id}:{fact}:{created_str}:{uuid.uuid4()}"
+                new_unique_id = hashlib.sha256(unique_id_str.encode('utf-8')).hexdigest()
+                conn.execute(
+                    text("UPDATE quarantine_memories SET unique_id = :val WHERE id = :id"),
+                    {"val": new_unique_id, "id": q_id}
+                )
+
+
 def run_migrations():
     _add_missing_columns("memories", MEMORY_COLUMNS)
+    _add_missing_columns("quarantine_memories", QUARANTINE_COLUMNS)
     _add_missing_columns("audit_events", AUDIT_COLUMNS)
     _correct_classification_stats_logic()
+    _backfill_unique_ids()

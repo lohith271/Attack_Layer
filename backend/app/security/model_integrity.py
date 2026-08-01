@@ -9,6 +9,7 @@ HASHES_FILE = os.path.join(MODELS_DIR, "model_hashes.json")
 
 MODEL_FILES = {
     "svm": "svm.pkl",
+    "one_class_svm": "one_class_svm.pkl",
     "xgboost": "xgboost.pkl",
     "lightgbm": "lightgbm.pkl",
     "mlp": "mlp.pth",

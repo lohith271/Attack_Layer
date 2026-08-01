@@ -225,6 +225,7 @@ class ThreatAnalyticsAgent(BaseAgent):
             mem_subset = memories[-10:] if len(memories) > 10 else memories
             trimmed_all_memories = [
                 {
+                    "unique_id": getattr(m, "unique_id", ""),
                     "fact": sanitize_payload(m.fact),
                     "category": m.category,
                     "memory_type": m.memory_type,
@@ -236,6 +237,7 @@ class ThreatAnalyticsAgent(BaseAgent):
             mem_today_subset = memories_today[-10:] if len(memories_today) > 10 else memories_today
             trimmed_inserted_today = [
                 {
+                    "unique_id": getattr(m, "unique_id", ""),
                     "fact": sanitize_payload(m.fact),
                     "category": m.category,
                     "memory_type": m.memory_type,
@@ -522,7 +524,7 @@ class ThreatAnalyticsAgent(BaseAgent):
                 ).first()
                 ip_str = audit_ev.ip_address if audit_ev and audit_ev.ip_address else "Unknown"
                 memories_details.append(
-                    f"  {idx}. [Memory ID: {m.id}] Fact: \"{m.fact}\" | Category: {m.category} | Source IP: {ip_str}"
+                    f"  {idx}. [Memory ID: {m.id} | Unique ID: {getattr(m, 'unique_id', 'N/A')}] Fact: \"{m.fact}\" | Category: {m.category} | Source IP: {ip_str}"
                 )
             
             if memories_details:

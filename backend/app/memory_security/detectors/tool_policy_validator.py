@@ -10,6 +10,7 @@ from app.memory_security.tool_policy_config import (
     APPROVED_APIS,
     TRUSTED_TOOLS,
     ALLOWED_BEHAVIORS,
+    CRITICAL_INFRA_IPS,
 )
 
 from app.memory_security.constants import (
@@ -480,6 +481,146 @@ class ToolPolicyValidator:
             "attack_type": "TOOL_POLICY_UPDATE",
 
         }
+
+    @classmethod
+    def validate_tool_execution(cls, db, tool_name: str, parameters: dict, user_id: str, original_user_prompt: str = None):
+        is_trusted = tool_name in cls.trusted_tools
+
+        param_str = str(parameters)
+        referenced_domains = cls.extract_referenced_domains(param_str)
+        unapproved_domains = [
+            domain for domain in referenced_domains
+            if not cls.validate_domain(domain)
+        ]
+
+        from app.database.models import Memory
+        stored_policies = []
+        if db and user_id:
+            memories = db.query(Memory).filter(
+                Memory.user_id == user_id,
+                Memory.category == "TOOL_POLICY",
+                Memory.active == True,
+                Memory.final_decision == "ALLOW"
+            ).all()
+            stored_policies = [m.fact for m in memories]
+
+        lowered_params = param_str.lower()
+        injection_signals = ["ignore previous", "bypass security", "forget prior rules", "disable ssl"]
+        has_injection = any(sig in lowered_params for sig in injection_signals)
+
+        # Action-Level Permission Gate Check
+        unauthorized_target = False
+        unauthorized_reason = None
+        if original_user_prompt:
+            target_keys = ["to", "dest", "recipient", "path", "file", "filepath", "url", "domain", "ip"]
+            for key in target_keys:
+                if key in parameters:
+                    val = str(parameters[key]).strip()
+                    check_val = val.lower()
+                    for prefix in ["https://", "http://", "www."]:
+                        if check_val.startswith(prefix):
+                            check_val = check_val[len(prefix):]
+                    if val and check_val not in original_user_prompt.lower():
+                        unauthorized_target = True
+                        unauthorized_reason = f"UNAUTHORIZED_TARGET:{val}"
+                        break
+
+        # Critical IP Protection Gate (Rung 4)
+        unauthorized_block = False
+        if tool_name == "block_ip":
+            for val in parameters.values():
+                if str(val).strip() in CRITICAL_INFRA_IPS:
+                    unauthorized_block = True
+                    break
+
+        # Firewall Allow-list Gate (Rung 4)
+        pending_human_approval = False
+        if tool_name == "allow_ip":
+            target_ip = parameters.get("ip") or parameters.get("ip_address") or next(iter(parameters.values()), None)
+            if target_ip and db:
+                from app.database.models import BlockedIP
+                target_ip_str = str(target_ip).strip()
+                entry = db.query(BlockedIP).filter(BlockedIP.ip_address == target_ip_str).first()
+                if not entry:
+                    entry = BlockedIP(
+                        ip_address=target_ip_str,
+                        block_count=0,
+                        total_interactions=1,
+                        block_rate=0.0,
+                        status="PENDING",
+                    )
+                    db.add(entry)
+                else:
+                    entry.status = "PENDING"
+                db.commit()
+            pending_human_approval = True
+
+        risk_score = cls.calculate_execution_misuse_score(
+            is_trusted=is_trusted,
+            unapproved_domains=unapproved_domains,
+            has_injection=has_injection,
+            parameters=parameters
+        )
+        if unauthorized_target or unauthorized_block or pending_human_approval:
+            risk_score = max(risk_score, 1.0)
+
+        decision = "ALLOW"
+        violation_reason = None
+
+        if not is_trusted:
+            decision = "BLOCK"
+            violation_reason = f"UNTRUSTED_TOOL:{tool_name}"
+        elif unauthorized_block:
+            decision = "BLOCK"
+            violation_reason = "PROTECTED_INFRASTRUCTURE"
+        elif pending_human_approval:
+            decision = "BLOCK"
+            violation_reason = "PENDING_HUMAN_APPROVAL"
+        elif unapproved_domains:
+            decision = "BLOCK"
+            violation_reason = f"UNAPPROVED_DOMAIN:{','.join(unapproved_domains)}"
+        elif unauthorized_target:
+            decision = "BLOCK"
+            violation_reason = unauthorized_reason
+        elif has_injection or risk_score >= 0.70:
+            decision = "BLOCK"
+            violation_reason = "SUSPICIOUS_PAYLOAD"
+
+        return {
+            "decision": decision,
+            "risk_score": risk_score,
+            "unapproved_domains": unapproved_domains,
+            "violation_reason": violation_reason,
+            "is_trusted": is_trusted,
+            "has_injection": has_injection
+        }
+
+    @classmethod
+    def calculate_execution_misuse_score(
+        cls,
+        is_trusted: bool,
+        unapproved_domains: list,
+        has_injection: bool,
+        parameters: dict
+    ):
+        risk = 0.0
+
+        if not is_trusted:
+            risk += 0.50
+
+        if unapproved_domains:
+            risk += 0.80
+
+        if has_injection:
+            risk += 0.40
+
+        param_str = str(parameters).lower()
+        if "cmd.exe" in param_str or "/bin/sh" in param_str or "rm -rf" in param_str:
+            risk += 0.50
+
+        return round(min(risk, 1.0), 4)
+
+
 
 
 def detect_tool_policy_poisoning(text):

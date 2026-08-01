@@ -151,7 +151,7 @@ def main():
     plt.bar(df_results['Model'], df_results['Accuracy'], color=colors[:len(df_results)])
     plt.ylabel('Accuracy')
     plt.title('Model Accuracy Comparison')
-    plt.ylim(0.8, 1.02)
+    plt.ylim(0.4, 1.02)
     for i, val in enumerate(df_results['Accuracy']):
         plt.text(i, val + 0.005, f"{val:.4f}", ha='center', va='bottom', fontweight='bold')
     acc_chart_path = os.path.join(FIGURES_DIR, "accuracy_comparison.png")
@@ -166,7 +166,7 @@ def main():
     plt.bar(df_results['Model'], df_results['F1'], color=colors[:len(df_results)])
     plt.ylabel('F1 Score')
     plt.title('Model F1 Score Comparison')
-    plt.ylim(0.8, 1.02)
+    plt.ylim(0.4, 1.02)
     for i, val in enumerate(df_results['F1']):
         plt.text(i, val + 0.005, f"{val:.4f}", ha='center', va='bottom', fontweight='bold')
     f1_chart_path = os.path.join(FIGURES_DIR, "f1_comparison.png")

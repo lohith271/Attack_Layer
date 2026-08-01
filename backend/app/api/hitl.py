@@ -242,6 +242,8 @@ def get_hitl_status(
         else:
             ollama_resp = explanation.get("human_decision_response") or "Your request was approved by a human reviewer and has been processed."
             response = f"✓ Request #{request_id} Approved:\n{ollama_resp}"
+    elif human_decision == "IP_BLOCKED":
+        response = explanation.get("human_decision_response") or f"⛔ **Security Notice**: Your IP address (`{event.ip_address}`) has been reviewed and officially BLOCKED by human security approval. You can no longer send messages or save memories."
     else:
         if event.memory_id:
             response = f"⚠ Request #{request_id} Rejected. The memory update was blocked by human review."
@@ -291,3 +293,112 @@ def get_resolved_hitl_items(db: Session = Depends(get_db)):
         })
 
     return result
+
+
+@router.post("/ip/approve/{ip_address}")
+def approve_ip_block(ip_address: str, db: Session = Depends(get_db)):
+    """Human Reviewer approves blocking the specified IP address."""
+    from app.database.models import BlockedIP, AuditEvent
+    import json
+
+    entry = db.query(BlockedIP).filter(BlockedIP.ip_address == ip_address).first()
+    if not entry:
+        entry = BlockedIP(ip_address=ip_address, status="BLOCKED", approved_by_human=True)
+        db.add(entry)
+    else:
+        entry.status = "BLOCKED"
+        entry.approved_by_human = True
+
+    block_notice = f"⛔ **Security Notice**: Your IP address (`{ip_address}`) has been reviewed and officially BLOCKED by human security approval. You can no longer send messages or save memories."
+
+    # Update explanation for recent audit events from this IP so HITL status polling gets the blocked notification
+    recent_events = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.ip_address == ip_address)
+        .order_by(AuditEvent.id.desc())
+        .limit(20)
+        .all()
+    )
+
+    for ev in recent_events:
+        exp = ev.explanation or {}
+        if isinstance(exp, str):
+            try:
+                exp = json.loads(exp)
+            except Exception:
+                exp = {}
+        exp["human_decision"] = "IP_BLOCKED"
+        exp["human_decision_response"] = block_notice
+        ev.explanation = json.dumps(exp)
+        ev.final_decision = "BLOCK"
+
+    db.commit()
+
+    return {
+        "status": "approved",
+        "message": f"IP {ip_address} has been approved for blocking and is now officially BLOCKED.",
+        "ip_address": ip_address,
+        "notification": block_notice
+    }
+
+
+@router.post("/ip/reject/{ip_address}")
+def reject_ip_block(ip_address: str, db: Session = Depends(get_db)):
+    """Human Reviewer rejects blocking the IP address (resets block state)."""
+    from app.database.models import BlockedIP
+    entry = db.query(BlockedIP).filter(BlockedIP.ip_address == ip_address).first()
+    if entry:
+        entry.status = "TRUSTED"
+        entry.approved_by_human = False
+        db.commit()
+
+    return {
+        "status": "rejected",
+        "message": f"IP {ip_address} block request was rejected. IP is now marked as Trusted.",
+        "ip_address": ip_address
+    }
+
+
+@router.get("/ip/pending")
+def get_pending_ip_approvals(db: Session = Depends(get_db)):
+    """Fetch all IP addresses pending human approval (status == PENDING)."""
+    from app.database.models import BlockedIP
+    entries = db.query(BlockedIP).filter(BlockedIP.status == "PENDING").all()
+    result = []
+    for entry in entries:
+        pct = round((entry.block_rate or 0.0) * 100, 1)
+        result.append({
+            "id": entry.id,
+            "ip_address": entry.ip_address,
+            "status": entry.status,
+            "block_count": entry.block_count,
+            "total_interactions": entry.total_interactions,
+            "block_rate_pct": pct,
+            "reason": entry.reason or "EXCESSIVE_BLOCKS",
+            "detection_reason": f"Exceeded 85% block rate threshold ({pct}% blocked out of {entry.total_interactions} interactions)",
+            "timestamp": entry.updated_at.strftime("%Y-%m-%d %H:%M:%S") if entry.updated_at else "Unknown"
+        })
+    return result
+
+
+@router.get("/ip/resolved")
+def get_resolved_ip_approvals(db: Session = Depends(get_db)):
+    """Fetch all resolved IP address block decisions (status in BLOCKED, TRUSTED)."""
+    from app.database.models import BlockedIP
+    entries = db.query(BlockedIP).filter(BlockedIP.status.in_(["BLOCKED", "TRUSTED"])).order_by(BlockedIP.updated_at.desc()).all()
+    result = []
+    for entry in entries:
+        pct = round((entry.block_rate or 0.0) * 100, 1)
+        result.append({
+            "id": entry.id,
+            "ip_address": entry.ip_address,
+            "status": "approved" if entry.status == "BLOCKED" and entry.approved_by_human else "rejected",
+            "decision": entry.status,
+            "block_count": entry.block_count,
+            "total_interactions": entry.total_interactions,
+            "block_rate_pct": pct,
+            "response": f"IP officially BLOCKED (Human Approved)" if (entry.status == "BLOCKED" and entry.approved_by_human) else "IP marked as TRUSTED (Block Rejected)",
+            "timestamp": entry.updated_at.strftime("%Y-%m-%d %H:%M:%S") if entry.updated_at else "Unknown"
+        })
+    return result
+

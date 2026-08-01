@@ -54,6 +54,10 @@ class AdversarialDetector:
         # rolling history per session (simplified: single global buffer)
         self._prev_embedding: Optional[np.ndarray] = None
 
+        # Initialize STRIP guard
+        from app.security.strip_guard import StripGuard
+        self.strip_guard = StripGuard()
+
     # ── Individual checks ───────────────────────────────────────────────
     def _check_norm(self, emb: np.ndarray) -> bool:
         """Return True if the L2 norm is within expected bounds."""
@@ -61,6 +65,14 @@ class AdversarialDetector:
         if norm > NORM_UPPER or norm < NORM_LOWER:
             logger.warning("Adversarial guard: norm=%.3f out of [%.1f, %.1f]",
                            norm, NORM_LOWER, NORM_UPPER)
+            return False
+        return True
+
+    def _check_linf_norm(self, emb: np.ndarray) -> bool:
+        """Return True if L_infinity norm is within max allowable noise bound."""
+        linf_norm = float(np.linalg.norm(emb, ord=np.inf))
+        if linf_norm > MAX_DIM_ABS:
+            logger.warning("Adversarial guard: Linf norm=%.3f exceeds max bound %.1f", linf_norm, MAX_DIM_ABS)
             return False
         return True
 
@@ -107,6 +119,7 @@ class AdversarialDetector:
             self._check_dimension_spike(emb),
             self._check_drift(emb),
             self._check_nn_model(emb),
+            self.strip_guard.is_safe(emb),
         ]
         return all(checks)
 

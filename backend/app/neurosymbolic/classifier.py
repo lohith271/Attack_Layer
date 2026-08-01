@@ -67,6 +67,9 @@ def _keyword_memory_type(text: str):
 
 
 def classify_category(text: str) -> dict:
+    text = text.strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
     kw_cat, kw_conf = _keyword_category(text)
     embedding = get_embedding(text)
     prototypes = get_category_prototypes()
@@ -97,6 +100,9 @@ def classify_category(text: str) -> dict:
 
 
 def classify_memory_type(text: str) -> dict:
+    text = text.strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
     kw_type, kw_conf = _keyword_memory_type(text)
     embedding = get_embedding(text)
     prototypes = get_memory_type_prototypes()

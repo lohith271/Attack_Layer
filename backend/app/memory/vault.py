@@ -560,9 +560,18 @@ def create_memory(
         )
 
         db.commit()
+    import hashlib
+    import uuid
+    from datetime import datetime
+
+    unique_id_str = f"{user_id}:{fact}:{datetime.utcnow().timestamp()}:{uuid.uuid4()}"
+    unique_id = hashlib.sha256(unique_id_str.encode('utf-8')).hexdigest()
+
     memory = Memory(
 
         user_id=user_id,
+
+        unique_id=unique_id,
 
         fact=fact,
 

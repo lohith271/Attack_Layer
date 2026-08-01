@@ -8,6 +8,10 @@ import {
     getHumanApprovalVsRejection,
     getAttackSeverityBreakdown,
     getIPIntelligence,
+    executeToolSimulation,
+    getToolPolicyViolations,
+    getTrustedToolsConfig,
+    getAllMemories,
 } from "../api/attacklayer";
 import "../styles/threat-analysis.css";
 
@@ -169,6 +173,16 @@ function ThreatAnalysisPage() {
     const [ipStatusFilter, setIpStatusFilter] = useState('All');
     const [loading, setLoading] = useState(true);
 
+    const [activeTab, setActiveTab] = useState("general");
+    const [toolViolations, setToolViolations] = useState([]);
+    const [toolsConfig, setToolsConfig] = useState({ approved_domains: [], approved_apis: [], trusted_tools: [] });
+    const [simResult, setSimResult] = useState(null);
+    const [simTool, setSimTool] = useState("web_search");
+    const [simParams, setSimParams] = useState('{\n  "url": "https://api.github.com/repos"\n}');
+    const [simUserId, setSimUserId] = useState("soc_sim_user");
+    const [simulating, setSimulating] = useState(false);
+    const [memoriesList, setMemoriesList] = useState([]);
+
     useEffect(() => {
         load();
         const timer = setInterval(load, 5000);
@@ -186,6 +200,9 @@ function ThreatAnalysisPage() {
                 humanData,
                 sevData,
                 ipData,
+                violationsData,
+                configData,
+                memoriesData,
             ] = await Promise.all([
                 getAttackStatistics(),
                 getAttackTrendOverTime(),
@@ -195,6 +212,9 @@ function ThreatAnalysisPage() {
                 getHumanApprovalVsRejection(),
                 getAttackSeverityBreakdown(),
                 getIPIntelligence(),
+                getToolPolicyViolations(),
+                getTrustedToolsConfig(),
+                getAllMemories(),
             ]);
             const updates = {
                 stats: statsData || {},
@@ -214,15 +234,65 @@ function ThreatAnalysisPage() {
             setHumanApproval(updates.humanApproval);
             setSeverity(updates.severity);
             setIpIntel(updates.ipIntel);
+            setToolViolations(violationsData || []);
+            setToolsConfig(configData || { approved_domains: [], approved_apis: [], trusted_tools: [] });
+            setMemoriesList(memoriesData || []);
+            
             // Persist to localStorage
             Object.entries(updates).forEach(([key, val]) => {
                 localStorage.setItem("attacklayer_threat_" + key, JSON.stringify(val));
             });
         } catch (err) {
             console.error("Failed to load threat analysis data — showing cached data", err);
-            // State already initialized from cache in useState(); nothing more to do
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleApproveIp(ipAddress) {
+        try {
+            await fetch(`http://localhost:8000/hitl/ip/approve/${ipAddress}`, { method: 'POST' });
+            load();
+        } catch (err) {
+            console.error("Failed to approve IP block", err);
+        }
+    }
+
+    async function handleRejectIp(ipAddress) {
+        try {
+            await fetch(`http://localhost:8000/hitl/ip/reject/${ipAddress}`, { method: 'POST' });
+            load();
+        } catch (err) {
+            console.error("Failed to reject IP block", err);
+        }
+    }
+
+
+    async function handleRunSimulation(e) {
+        e.preventDefault();
+        setSimulating(true);
+        setSimResult(null);
+        try {
+            let parsedParams = {};
+            try {
+                parsedParams = JSON.parse(simParams);
+            } catch (err) {
+                parsedParams = { raw: simParams };
+            }
+            const res = await executeToolSimulation(simTool, parsedParams, simUserId);
+            setSimResult(res);
+            // Refresh violations log
+            const updatedViolations = await getToolPolicyViolations();
+            setToolViolations(updatedViolations || []);
+        } catch (err) {
+            console.error("Simulation failed:", err);
+            setSimResult({
+                decision: "ERROR",
+                risk_score: 1.0,
+                violation_reason: "Failed to connect or invalid payload format."
+            });
+        } finally {
+            setSimulating(false);
         }
     }
 
@@ -253,12 +323,51 @@ function ThreatAnalysisPage() {
 
     return (
         <>
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: "16px" }}>
                 <h1 className="page-title">Threat Analysis & Security Intelligence</h1>
                 <p className="page-subtitle">
                     Comprehensive analytics on detected threats, decisions, and security patterns
                 </p>
             </div>
+
+            {/* ===== TABS HEADER ===== */}
+            <div className="ta-tabs" style={{ display: "flex", gap: "16px", marginBottom: "24px", borderBottom: "1px solid var(--color-border)", paddingBottom: "2px" }}>
+                <button 
+                    onClick={() => setActiveTab("general")} 
+                    className={`tab-btn ${activeTab === "general" ? "active" : ""}`}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        color: activeTab === "general" ? "var(--color-primary)" : "var(--color-text-muted)",
+                        fontSize: "15px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        paddingBottom: "8px",
+                        borderBottom: activeTab === "general" ? "2px solid var(--color-primary)" : "none"
+                    }}
+                >
+                    📊 General Threat Intelligence
+                </button>
+                <button 
+                    onClick={() => setActiveTab("tools")} 
+                    className={`tab-btn ${activeTab === "tools" ? "active" : ""}`}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        color: activeTab === "tools" ? "var(--color-primary)" : "var(--color-text-muted)",
+                        fontSize: "15px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        paddingBottom: "8px",
+                        borderBottom: activeTab === "tools" ? "2px solid var(--color-primary)" : "none"
+                    }}
+                >
+                    🔧 Tool Security & Misuse Simulator
+                </button>
+            </div>
+
+            {activeTab === "general" ? (
+                <>
 
             {/* ===== KPI CARDS ===== */}
             <div className="ta-kpi-grid">
@@ -478,7 +587,8 @@ function ThreatAnalysisPage() {
                                 <th>Risk Score</th>
                                 <th>Reputation</th>
                                 <th>Threat Type</th>
-                                <th>Request Count</th>
+                                <th>Total Requests</th>
+                                <th>Blocked Requests</th>
                                 <th>Last Seen</th>
                                 <th>Status</th>
                                 <th>Action</th>
@@ -517,14 +627,16 @@ function ThreatAnalysisPage() {
                                                 : risk > 0.4
                                                 ? "risk-mid"
                                                 : "risk-low";
+                                        const st = (ip.status || '').toUpperCase();
                                         const statusCls =
-                                            ip.status === 'TRUSTED'
+                                            st === 'TRUSTED'
                                                 ? 'status-trusted'
-                                                : ip.status === 'SUSPICIOUS'
+                                                : st === 'SUSPICIOUS' || st === 'PENDING REVIEW' || st === 'PENDING'
                                                 ? 'status-suspicious'
-                                                : ip.status === 'BLOCKED'
+                                                : st === 'BLOCKED'
                                                 ? 'status-blocked'
                                                 : '';
+                                        const blockedCnt = ip.blockedRequests ?? ip.blockedCount ?? 0;
                                         return (
                                             <tr key={i}>
                                                 <td><span className="ip-code">{ip.ipAddress || ip.ip || "—"}</span></td>
@@ -535,7 +647,10 @@ function ThreatAnalysisPage() {
                                                 </td>
                                                 <td title={`Reputation: ${ip.reputation}`}>{ip.reputation || "—"}</td>
                                                 <td title={`Threat Type: ${ip.threatType}`}>{ip.threatType || "Unknown"}</td>
-                                                <td style={{ fontWeight: 600 }}>{ip.requestCount || ip.attempts || 0}</td>
+                                                <td style={{ fontWeight: 600 }}>{ip.totalRequests ?? ip.requestCount ?? ip.attempts ?? 0}</td>
+                                                <td style={{ fontWeight: 600, color: blockedCnt > 0 ? "#ef4444" : "var(--color-text)" }}>
+                                                    {blockedCnt}
+                                                </td>
                                                 <td>{ip.lastSeen || "—"}</td>
                                                 <td>
                                                     <span className={`status-badge ${statusCls}`} title={`Status: ${ip.status}`}>
@@ -543,16 +658,43 @@ function ThreatAnalysisPage() {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <button className="ip-action-btn" title="Review IP">
-                                                        🔍 Review
-                                                    </button>
+                                                    {st === 'BLOCKED' ? (
+                                                        <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600' }}>🔒 Blocked</span>
+                                                    ) : st === 'PENDING REVIEW' || st === 'PENDING' ? (
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <button 
+                                                                onClick={() => handleApproveIp(ip.ipAddress || ip.ip)}
+                                                                style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                                                title="Approve IP Block"
+                                                            >
+                                                                🚫 Block
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleRejectIp(ip.ipAddress || ip.ip)}
+                                                                style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                                                title="Allow IP"
+                                                            >
+                                                                ✅ Allow
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <button 
+                                                                onClick={() => handleApproveIp(ip.ipAddress || ip.ip)}
+                                                                style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                                                title="Block IP Address Immediately"
+                                                            >
+                                                                🚫 Block IP
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
                                     })
                             ) : (
                                 <tr>
-                                    <td colSpan={10} style={{ textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px", fontSize: 13 }}>
+                                    <td colSpan={11} style={{ textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px", fontSize: 13 }}>
                                         No IP intelligence data available
                                     </td>
                                 </tr>
@@ -561,6 +703,264 @@ function ThreatAnalysisPage() {
                     </table>
                 </div>
             </div>
+
+            {/* ===== MEMORY SHA-256 INTELLIGENCE ===== */}
+            <div className="ip-intel-section" style={{ marginTop: "32px" }}>
+                <div className="ip-intel-header">
+                    <h2>🧠 Active Memory Integrity & SHA-256 IDs</h2>
+                </div>
+                <div style={{ padding: "8px 16px", fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "12px" }}>
+                    Whenever a fact is recorded into long-term or episodic memory, a unique SHA-256 ID is generated for threat analysis and audits. Below are the registered memory records and their corresponding SHA-256 IDs.
+                </div>
+                <div className="ip-intel-table-wrap" style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                        <thead>
+                            <tr style={{ borderBottom: "1px solid var(--color-border)", textAlign: "left", color: "var(--color-text-muted)", fontWeight: "600" }}>
+                                <th style={{ padding: "12px" }}>Memory Fact</th>
+                                <th style={{ padding: "12px" }}>Category</th>
+                                <th style={{ padding: "12px" }}>Type</th>
+                                <th style={{ padding: "12px" }}>Trust Score</th>
+                                <th style={{ padding: "12px" }}>SHA-256 Unique ID</th>
+                                <th style={{ padding: "12px" }}>Status</th>
+                                <th style={{ padding: "12px" }}>Copy ID</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {memoriesList && memoriesList.length > 0 ? (
+                                memoriesList.map((mem, i) => {
+                                    const trust = mem.trust_score || 0;
+                                    const trustCls = trust >= 0.7 ? "trust-high" : trust >= 0.4 ? "trust-mid" : "trust-low";
+                                    return (
+                                        <tr key={i} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                            <td style={{ padding: "12px", fontWeight: "600", color: "var(--color-text)", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={mem.fact}>
+                                                {mem.fact || "—"}
+                                            </td>
+                                            <td style={{ padding: "12px" }}>
+                                                <span className="memory-meta-chip" style={{ fontSize: "11px", fontWeight: "600" }}>{mem.category || "UNKNOWN"}</span>
+                                            </td>
+                                            <td style={{ padding: "12px" }}>
+                                                <span className="memory-meta-chip" style={{ fontSize: "11px" }}>{mem.memory_type || "SHORT_TERM"}</span>
+                                            </td>
+                                            <td style={{ padding: "12px" }}>
+                                                <span className={`memory-meta-chip ${trustCls}`} style={{ fontSize: "11px", fontWeight: "600" }}>{trust.toFixed(2)}</span>
+                                            </td>
+                                            <td style={{ padding: "12px", fontFamily: "monospace", color: "#8b5cf6", fontWeight: "600" }} title={mem.unique_id}>
+                                                {mem.unique_id ? `${mem.unique_id.slice(0, 16)}...${mem.unique_id.slice(-8)}` : "—"}
+                                            </td>
+                                            <td style={{ padding: "12px" }}>
+                                                <span className={`status-badge ${mem.status === 'ACTIVE' ? 'status-trusted' : 'status-blocked'}`} style={{ fontSize: "11px" }}>
+                                                    {mem.status || "ACTIVE"}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: "12px" }}>
+                                                <button
+                                                    onClick={() => {
+                                                        if (mem.unique_id) {
+                                                            navigator.clipboard.writeText(mem.unique_id);
+                                                            alert("Unique SHA-256 ID copied to clipboard!");
+                                                        }
+                                                    }}
+                                                    style={{ padding: "4px 8px", fontSize: "11px", fontWeight: "600", background: "var(--color-primary-bg)", color: "var(--color-primary)", border: "1px solid var(--color-primary-bg-hover)", borderRadius: "4px", cursor: "pointer" }}
+                                                    disabled={!mem.unique_id}
+                                                >
+                                                    Copy
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} style={{ textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px", fontSize: 13 }}>
+                                        No memory entries available
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            </>
+            ) : (
+            <div className="tools-security-view" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px" }}>
+                    
+                    <div className="chart-card" style={{ padding: "20px" }}>
+                        <h2 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px", color: "var(--color-text)" }}>
+                            🛡️ Tool Policy Configuration
+                        </h2>
+                        
+                        <div style={{ marginBottom: "20px" }}>
+                            <h3 style={{ fontSize: "12px", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "8px", fontWeight: "600" }}>
+                                Trusted Tools ({toolsConfig.trusted_tools?.length || 0})
+                            </h3>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                {toolsConfig.trusted_tools?.map((t) => (
+                                    <span key={t} style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: "600" }}>
+                                        {t}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                            <h3 style={{ fontSize: "12px", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "8px", fontWeight: "600" }}>
+                                Approved Domains ({toolsConfig.approved_domains?.length || 0})
+                            </h3>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                {toolsConfig.approved_domains?.map((d) => (
+                                    <span key={d} style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: "600" }}>
+                                        {d}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style={{ fontSize: "12px", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "8px", fontWeight: "600" }}>
+                                Whitelisted APIs ({toolsConfig.approved_apis?.length || 0})
+                            </h3>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                {toolsConfig.approved_apis?.map((a) => (
+                                    <span key={a} style={{ background: "rgba(139, 92, 246, 0.1)", color: "#8b5cf6", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: "600" }}>
+                                        {a}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="chart-card" style={{ padding: "20px" }}>
+                        <h2 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px", color: "var(--color-text)" }}>
+                            🧪 Tool Execution Simulator
+                        </h2>
+
+                        <form onSubmit={handleRunSimulation} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                            <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "6px", color: "var(--color-text-muted)" }}>
+                                    Select Tool Name
+                                </label>
+                                <select 
+                                    value={simTool} 
+                                    onChange={(e) => setSimTool(e.target.value)}
+                                    style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid var(--color-border)", background: "var(--color-bg-card)", color: "var(--color-text)", fontWeight: "600" }}
+                                >
+                                    <option value="web_search">web_search</option>
+                                    <option value="code_interpreter">code_interpreter</option>
+                                    <option value="file_reader">file_reader</option>
+                                    <option value="database_query">database_query</option>
+                                    <option value="calculator">calculator</option>
+                                    <option value="untrusted_tool">untrusted_tool (Custom/Untrusted)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "6px", color: "var(--color-text-muted)" }}>
+                                    User Identifier
+                                </label>
+                                <input 
+                                    type="text" 
+                                    value={simUserId} 
+                                    onChange={(e) => setSimUserId(e.target.value)}
+                                    placeholder="soc_sim_user"
+                                    style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid var(--color-border)", background: "var(--color-bg-card)", color: "var(--color-text)", fontWeight: "600" }}
+                                />
+                            </div>
+
+                            <div style={{ gridColumn: "span 2" }}>
+                                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "6px", color: "var(--color-text-muted)" }}>
+                                    Tool Parameters (JSON Format)
+                                </label>
+                                <textarea 
+                                    rows={4}
+                                    value={simParams} 
+                                    onChange={(e) => setSimParams(e.target.value)}
+                                    style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid var(--color-border)", background: "var(--color-bg-card)", color: "var(--color-text)", fontFamily: "monospace", fontSize: "13px" }}
+                                />
+                            </div>
+
+                            <div style={{ gridColumn: "span 2" }}>
+                                <button 
+                                    type="submit" 
+                                    disabled={simulating}
+                                    style={{ width: "100%", padding: "12px", borderRadius: "6px", background: "var(--color-primary)", color: "#ffffff", border: "none", fontWeight: "700", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+                                >
+                                    {simulating ? "Simulating execution..." : "🚀 Run Execution Check"}
+                                </button>
+                            </div>
+                        </form>
+
+                        {simResult && (
+                            <div style={{ padding: "16px", borderRadius: "8px", border: simResult.decision === "BLOCK" ? "1px solid #ef4444" : "1px solid #10b981", background: simResult.decision === "BLOCK" ? "rgba(239, 68, 68, 0.05)" : "rgba(16, 185, 129, 0.05)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                                    <span style={{ fontSize: "14px", fontWeight: "700", color: simResult.decision === "BLOCK" ? "#ef4444" : "#10b981" }}>
+                                        Verdict: {simResult.decision}
+                                    </span>
+                                    <span style={{ fontSize: "12px", fontWeight: "600", background: simResult.decision === "BLOCK" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)", color: simResult.decision === "BLOCK" ? "#ef4444" : "#10b981", padding: "2px 8px", borderRadius: "4px" }}>
+                                        Risk Score: {simResult.risk_score?.toFixed(4) || "0.00"}
+                                    </span>
+                                </div>
+
+                                <div style={{ fontSize: "13px", color: "var(--color-text)", display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <div><strong>Violations Identified:</strong> {simResult.violation_reason || "None (Complies with Whitelist)"}</div>
+                                    {simResult.unapproved_domains?.length > 0 && (
+                                        <div style={{ color: "#ef4444" }}><strong>Unapproved Domains Blocked:</strong> {simResult.unapproved_domains.join(", ")}</div>
+                                    )}
+                                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                                        Is Trusted Tool: {simResult.is_trusted ? "Yes" : "No"} | Contains Injection: {simResult.has_injection ? "Yes" : "No"}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="chart-card" style={{ padding: "20px" }}>
+                    <h2 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px", color: "var(--color-text)" }}>
+                        🚨 Blocked Tool Execution History
+                    </h2>
+                    
+                    <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                            <thead>
+                                <tr style={{ borderBottom: "1px solid var(--color-border)", textAlign: "left", color: "var(--color-text-muted)", fontWeight: "600" }}>
+                                    <th style={{ padding: "12px" }}>User</th>
+                                    <th style={{ padding: "12px" }}>Action / Payload Details</th>
+                                    <th style={{ padding: "12px" }}>Risk Score</th>
+                                    <th style={{ padding: "12px" }}>Unapproved Domains</th>
+                                    <th style={{ padding: "12px" }}>Violation Reason</th>
+                                    <th style={{ padding: "12px" }}>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {toolViolations.length > 0 ? (
+                                    toolViolations.map((v, i) => (
+                                        <tr key={i} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                                            <td style={{ padding: "12px", fontWeight: "600" }}>{v.user_id}</td>
+                                            <td style={{ padding: "12px", fontFamily: "monospace", maxWidth: "350px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={v.policy_text}>{v.policy_text}</td>
+                                            <td style={{ padding: "12px", color: "#ef4444", fontWeight: "700" }}>{v.risk_score?.toFixed(2)}</td>
+                                            <td style={{ padding: "12px", color: "#ef4444" }}>{v.unapproved_domains || "—"}</td>
+                                            <td style={{ padding: "12px" }}>
+                                                <span style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: "700" }}>
+                                                    {v.violation_reason || "UNKNOWN"}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: "12px", color: "var(--color-text-muted)" }}>{v.created_at ? new Date(v.created_at).toLocaleString() : "—"}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} style={{ textAlign: "center", padding: "24px", color: "var(--color-text-muted)" }}>
+                                            No tool policy violations recorded
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            )}
         </>
     );
 }

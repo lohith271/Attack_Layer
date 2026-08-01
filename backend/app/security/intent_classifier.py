@@ -23,6 +23,11 @@ INTENT_EXAMPLES = {
         "I live in Hyderabad",
         "My favorite language is Python",
         "Professor Smith approved Project X",
+        "I visited Mysore this morning",
+        "I met my professor this evening",
+        "I watched a movie yesterday",
+        "I ate lunch just now",
+        "I went to the park this afternoon",
     ],
     "MEMORY_UPDATE": [
         "Update my memory about location",
@@ -108,6 +113,10 @@ def classify_intent(text: str, db=None, user_id=None):
         _resolve_write_vs_update,
     )
 
+    text = text.strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
+
     embedding = get_embedding(text)
     scores = _intent_scores(embedding)
 
@@ -141,6 +150,23 @@ def classify_intent(text: str, db=None, user_id=None):
                 "my career ",
                 "my hometown ",
                 "my goal is ",
+                "i went ",
+                "i visited ",
+                "i watched ",
+                "i met ",
+                "i had ",
+                "i ate ",
+                "i saw ",
+                "i read ",
+                "i bought ",
+                "i played ",
+                "yesterday ",
+                "today ",
+                "last night ",
+                "this morning ",
+                "this afternoon ",
+                "this evening ",
+                "just now ",
             )
         )
     )

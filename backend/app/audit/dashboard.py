@@ -1,5 +1,5 @@
 import json
-from app.database.models import AuditEvent
+from app.database.models import AuditEvent, BlockedIP
 
 
 def get_ip_intelligence(db):
@@ -13,6 +13,9 @@ def get_ip_intelligence(db):
         if ip not in ip_groups:
             ip_groups[ip] = []
         ip_groups[ip].append(record)
+
+    # Fetch all BlockedIP DB entries
+    blocked_ip_entries = {b.ip_address: b for b in db.query(BlockedIP).all()}
 
     ip_data = []
     for ip, events in ip_groups.items():
@@ -42,18 +45,23 @@ def get_ip_intelligence(db):
         else:
             reputation = "Poor"
 
-        # Status: Trusted, Suspicious, Blocked (Title Case for frontend)
-        if blocked_count > 0:
+        # Check DB BlockedIP entry status
+        ip_entry = blocked_ip_entries.get(ip)
+        if ip_entry and ip_entry.status == "BLOCKED" and ip_entry.approved_by_human:
             status = "Blocked"
-        elif risk_score >= 0.7:
+        elif ip_entry and ip_entry.status == "PENDING":
+            status = "Pending Review"
+        elif blocked_count > 0 or risk_score >= 0.4:
             status = "Suspicious"
         else:
             status = "Trusted"
 
         # Action based on status
-        if status == "BLOCKED":
+        if status == "Blocked":
             action = "Blocked"
-        elif status == "SUSPICIOUS":
+        elif status == "Pending Review":
+            action = "Review Pending"
+        elif status == "Suspicious":
             action = "Monitor"
         else:
             action = "Allow"
@@ -66,6 +74,10 @@ def get_ip_intelligence(db):
             "reputation": reputation,
             "threatType": threat_type,
             "requestCount": request_count,
+            "totalRequests": request_count,
+            "blockedCount": blocked_count,
+            "blockedRequests": blocked_count,
+            "blockRate": round((blocked_count / request_count * 100) if request_count > 0 else 0.0, 1),
             "lastSeen": last_seen.isoformat() if last_seen else "",
             "status": status,
             "action": action
@@ -74,6 +86,7 @@ def get_ip_intelligence(db):
     # Sort by risk score descending
     ip_data.sort(key=lambda x: x["riskScore"], reverse=True)
     return ip_data
+
 
 
 def get_blocked_events(db):

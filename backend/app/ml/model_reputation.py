@@ -1,8 +1,29 @@
 import os
 import json
+import numpy as np
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPUTATION_FILE = os.path.join(BASE_DIR, "ml", "models", "model_reputation.json")
+REPUTATION_HISTORY_FILE = os.path.join(BASE_DIR, "ml", "models", "model_reputation_history.json")
+
+def load_reputation_history() -> dict:
+    """Load model prediction history from file."""
+    if not os.path.exists(REPUTATION_HISTORY_FILE):
+        return {}
+    try:
+        with open(REPUTATION_HISTORY_FILE, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading reputation history: {e}")
+        return {}
+
+def save_reputation_history(history: dict):
+    """Save model prediction history to file."""
+    try:
+        with open(REPUTATION_HISTORY_FILE, "w") as f:
+            json.dump(history, f, indent=4)
+    except Exception as e:
+        print(f"Error saving reputation history: {e}")
 
 DEFAULT_REPUTATION = {
     "svm": {
@@ -120,6 +141,95 @@ def get_weights(active_models: list = None) -> dict:
         return {k: v / total for k, v in weights.items()}
     else:
         return {k: 1.0 / len(active_models) for k in active_models}
+
+def update_ensemble_reputation(model_predictions: dict, ensemble_prediction: int):
+    """
+    Update historical metrics and weights for all models in the ensemble.
+    Implements a FoolsGold-inspired collusion penalty if multiple disagreeing models
+    exhibit highly similar prediction histories.
+    """
+    reputation = load_reputation()
+    history = load_reputation_history()
+    
+    # Initialize history for active models
+    for name in model_predictions.keys():
+        if name not in history:
+            history[name] = []
+            
+    # Append current round predictions (centered probability of predicting class 1)
+    for name, res in model_predictions.items():
+        pred = res["prediction"]
+        conf = res["confidence"]
+        p1 = conf if pred == 1 else (1.0 - conf)
+        # Center around 0.5 to yield a range of [-0.5, 0.5]
+        centered_prob = p1 - 0.5
+        history[name].append(centered_prob)
+        if len(history[name]) > 50:
+            history[name] = history[name][-50:]
+            
+    save_reputation_history(history)
+    
+    # Identify agreeing vs disagreeing models
+    disagreeing_models = []
+    agreeing_models = []
+    
+    for name, res in model_predictions.items():
+        if name not in reputation:
+            continue
+        reputation[name]["total_predictions"] += 1
+        if res["prediction"] == ensemble_prediction:
+            reputation[name]["agreement_count"] += 1
+            agreeing_models.append(name)
+        else:
+            disagreeing_models.append(name)
+            
+        reputation[name]["agreement_rate"] = reputation[name]["agreement_count"] / reputation[name]["total_predictions"]
+        reputation[name]["confidence_sum"] += res["confidence"]
+        
+    # Check for collusion among disagreeing models
+    colluding_models = set()
+    if len(disagreeing_models) > 1:
+        for i in range(len(disagreeing_models)):
+            m_i = disagreeing_models[i]
+            hist_i = history.get(m_i, [])
+            if len(hist_i) < 3:
+                continue
+            for j in range(i + 1, len(disagreeing_models)):
+                m_j = disagreeing_models[j]
+                hist_j = history.get(m_j, [])
+                if len(hist_j) < 3:
+                    continue
+                # Calculate Cosine Similarity
+                v1 = np.array(hist_i)
+                v2 = np.array(hist_j)
+                min_len = min(len(v1), len(v2))
+                v1 = v1[-min_len:]
+                v2 = v2[-min_len:]
+                norm1 = np.linalg.norm(v1)
+                norm2 = np.linalg.norm(v2)
+                if norm1 > 0 and norm2 > 0:
+                    similarity = float(np.dot(v1, v2) / (norm1 * norm2))
+                    if similarity > 0.75:
+                        colluding_models.add(m_i)
+                        colluding_models.add(m_j)
+                        
+    # Apply weight adjustments
+    total_penalty = 0.0
+    for name in disagreeing_models:
+        old_weight = reputation[name]["weight"]
+        # Harsher penalty if colluding (0.05 vs 0.02)
+        penalty_step = 0.05 if name in colluding_models else 0.02
+        new_weight = max(0.10, old_weight - penalty_step)
+        reputation[name]["weight"] = new_weight
+        total_penalty += (old_weight - new_weight)
+        
+    # Redistribute penalty weight ONLY to agreeing models
+    if total_penalty > 0 and agreeing_models:
+        share = total_penalty / len(agreeing_models)
+        for name in agreeing_models:
+            reputation[name]["weight"] += share
+            
+    save_reputation(reputation)
 
 def update_reputation(model_name: str, agreed: bool, confidence: float, actual_correct: bool = None):
     """

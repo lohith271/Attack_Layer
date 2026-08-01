@@ -19,9 +19,10 @@ def run_script(module_name: str):
 def main():
     print("--- STARTING ORCHESTRATED MULTI-MODEL TRAINING ---")
     
-    # 1. Train all 9 models
+    # 1. Train all 10 models
     training_scripts = [
         "app.ml.train.train_svm",
+        "app.ml.train.train_one_class_svm",
         "app.ml.train.train_xgboost",
         "app.ml.train.train_lightgbm",
         "app.ml.train.train_mlp",
@@ -43,7 +44,7 @@ def main():
     os.makedirs(registry_dir, exist_ok=True)
     
     model_files = [
-        "svm.pkl", "xgboost.pkl", "lightgbm.pkl", "mlp.pth", "mlp.pt", 
+        "svm.pkl", "one_class_svm.pkl", "xgboost.pkl", "lightgbm.pkl", "mlp.pth", "mlp.pt", 
         "random_forest.pkl", "logistic_regression.pkl",
         "transformer_emb.pth", "cnn_1d.pth", "adaboost.pkl"
     ]

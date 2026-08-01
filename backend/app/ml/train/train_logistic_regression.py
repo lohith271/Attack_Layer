@@ -1,35 +1,35 @@
 import os
 import joblib
+import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
 from sklearn.calibration import CalibratedClassifierCV
 from app.ml.utils import load_split_data
 
 def main():
-    print("--- Training Logistic Regression ---")
+    print("--- Training Logistic Regression (Hardened) ---")
     X_train, X_val, X_test, y_train, y_val, y_test = load_split_data()
     
-    param_grid = {
-        'C': [0.01, 0.1, 1.0, 10.0, 100.0],
-        'penalty': ['l2'],
-        'solver': ['lbfgs']
-    }
+    # Augment training data with adversarial Gaussian noise to smooth boundary
+    np.random.seed(42)
+    noise = np.random.normal(0, 0.03, X_train.shape)
+    X_train_aug = np.vstack([X_train, X_train + noise])
+    y_train_aug = np.hstack([y_train, y_train])
     
-    print("Performing grid search...")
-    grid = GridSearchCV(
-        LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000),
-        param_grid,
-        cv=5,
-        scoring='f1'
+    print("Fitting LogisticRegression directly...")
+    best_lr = LogisticRegression(
+        class_weight='balanced',
+        C=0.5,
+        penalty='l2',
+        solver='lbfgs',
+        random_state=42,
+        max_iter=1000
     )
-    grid.fit(X_train, y_train)
-    
-    best_lr = grid.best_estimator_
-    print(f"Best parameters found: {grid.best_params_}")
+    best_lr.fit(X_train_aug, y_train_aug)
     
     print("Calibrating classifier...")
     model = CalibratedClassifierCV(estimator=best_lr, cv=5)
-    model.fit(X_train, y_train)
+    model.fit(X_train_aug, y_train_aug)
     
     models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
     os.makedirs(models_dir, exist_ok=True)

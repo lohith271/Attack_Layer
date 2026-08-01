@@ -172,9 +172,9 @@ function ChatPage() {
             const res = await sendChatMessage(activeId, msg);
             const aiMsg = {
                 role: "assistant",
-                content: res.hitl_request_id
+                content: res.response || (res.hitl_request_id
                     ? `⏳ This request requires human approval (Request #${res.hitl_request_id}). The response will appear here once approved.`
-                    : res.response || res.message || "I couldn't process that request.",
+                    : res.message || "I couldn't process that request."),
                 time: new Date().toISOString(),
             };
             setSessions((prev) =>

@@ -63,4 +63,18 @@ def log_security_event(
     db.commit()
     db.refresh(event)
 
+    if final_decision == "ALLOW_WITH_WARNING":
+        try:
+            from app.utils.email_service import send_approval_alert_email_async
+            send_approval_alert_email_async(
+                event_id=event.id,
+                payload=payload,
+                threat_type=threat,
+                severity=risk_level,
+                memory_id=memory_id
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger("app.audit.logger").error(f"Failed to trigger async email alert: {e}")
+
     return event

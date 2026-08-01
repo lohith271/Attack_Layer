@@ -1,7 +1,8 @@
+import os
 import numpy as np
 import torch
 from app.ml.model_manager import get_model, get_active_models
-from app.ml.model_reputation import get_weights, update_reputation
+from app.ml.model_reputation import get_weights, update_reputation, update_ensemble_reputation
 
 def predict_model_single(model_name: str, model_instance, embedding: np.ndarray) -> dict:
     """
@@ -35,7 +36,7 @@ def predict_model_single(model_name: str, model_instance, embedding: np.ndarray)
             
     return {"prediction": prediction, "confidence": confidence}
 
-def get_ensemble_prediction(embedding_list: list) -> dict:
+def get_ensemble_prediction(embedding_list: list, method: str = None) -> dict:
     """
     Predict using the ensemble of active models.
     Input: embedding_list (list of floats, e.g. length 768)
@@ -48,6 +49,9 @@ def get_ensemble_prediction(embedding_list: list) -> dict:
         "low_trust": bool
     }
     """
+    if method is None:
+        method = os.getenv("ENSEMBLE_AGGREGATION_METHOD", "median")
+
     # Convert list to numpy array
     embedding = np.array(embedding_list, dtype=np.float32)
     
@@ -61,7 +65,6 @@ def get_ensemble_prediction(embedding_list: list) -> dict:
     weights = get_weights(active_models)
     
     model_predictions = {}
-    weighted_votes = {0: 0.0, 1: 0.0}
     
     for name in active_models:
         model_instance = get_model(name)
@@ -70,39 +73,75 @@ def get_ensemble_prediction(embedding_list: list) -> dict:
         try:
             res = predict_model_single(name, model_instance, embedding)
             model_predictions[name] = res
-            
-            # Aggregate weighted votes
-            pred = res["prediction"]
-            conf = res["confidence"]
-            weight = weights.get(name, 0.25)
-            
-            weighted_votes[pred] += weight * conf
         except Exception as e:
             print(f"Error predicting with model {name}: {e}")
             
     if not model_predictions:
         raise RuntimeError("All models failed during prediction.")
         
-    # Determine ensemble decision
-    ensemble_prediction = int(max(weighted_votes, key=weighted_votes.get))
-    
-    # Calculate confidence aggregation (average confidence of models that voted for the majority class,
-    # or general weighted confidence)
-    # Let's use the sum of weighted confidences for the chosen class normalized by sum of weights of voting models
-    total_weight = sum(weights.get(name, 0.25) for name in model_predictions.keys())
-    ensemble_confidence = weighted_votes[ensemble_prediction] / (total_weight if total_weight > 0 else 1.0)
+    # Aggregation methods
+    if method == "median":
+        # Collect class-1 (Attack) probability for each model
+        probs_class_1 = []
+        for name, res in model_predictions.items():
+            pred = res["prediction"]
+            conf = res["confidence"]
+            p1 = conf if pred == 1 else (1.0 - conf)
+            probs_class_1.append(p1)
+            
+        median_prob_1 = float(np.median(probs_class_1))
+        if median_prob_1 >= 0.5:
+            ensemble_prediction = 1
+            ensemble_confidence = median_prob_1
+        else:
+            ensemble_prediction = 0
+            ensemble_confidence = 1.0 - median_prob_1
+
+    elif method == "trimmed_mean":
+        probs_class_1 = []
+        for name, res in model_predictions.items():
+            pred = res["prediction"]
+            conf = res["confidence"]
+            p1 = conf if pred == 1 else (1.0 - conf)
+            probs_class_1.append(p1)
+            
+        sorted_probs = sorted(probs_class_1)
+        beta = 0.2  # Trim 20% from both ends
+        k = int(beta * len(sorted_probs))
+        if k > 0 and len(sorted_probs) > 2 * k:
+            trimmed_probs = sorted_probs[k:-k]
+        else:
+            trimmed_probs = sorted_probs
+            
+        mean_prob_1 = float(np.mean(trimmed_probs))
+        if mean_prob_1 >= 0.5:
+            ensemble_prediction = 1
+            ensemble_confidence = mean_prob_1
+        else:
+            ensemble_prediction = 0
+            ensemble_confidence = 1.0 - mean_prob_1
+
+    else:
+        # Default: weighted_average
+        weighted_votes = {0: 0.0, 1: 0.0}
+        for name, res in model_predictions.items():
+            pred = res["prediction"]
+            conf = res["confidence"]
+            weight = weights.get(name, 0.25)
+            weighted_votes[pred] += weight * conf
+            
+        ensemble_prediction = int(max(weighted_votes, key=weighted_votes.get))
+        total_weight = sum(weights.get(name, 0.25) for name in model_predictions.keys())
+        ensemble_confidence = weighted_votes[ensemble_prediction] / (total_weight if total_weight > 0 else 1.0)
+        
     ensemble_confidence = min(1.0, max(0.0, ensemble_confidence))
     
     # Agreement rate: fraction of active models that agree with the ensemble decision
-    agreeing_models = 0
-    for name, res in model_predictions.items():
-        is_agree = (res["prediction"] == ensemble_prediction)
-        agreeing_models += 1 if is_agree else 0
-        
-        # Update model reputation dynamically based on agreement
-        update_reputation(name, agreed=is_agree, confidence=res["confidence"])
-        
+    agreeing_models = sum(1 for name, res in model_predictions.items() if res["prediction"] == ensemble_prediction)
     agreement_rate = agreeing_models / len(model_predictions)
+    
+    # Update model reputation dynamically with collusion detection (FoolsGold style)
+    update_ensemble_reputation(model_predictions, ensemble_prediction)
     
     # Flag low trust if models disagree too much
     low_trust = agreement_rate < 0.5 or ensemble_confidence < 0.6

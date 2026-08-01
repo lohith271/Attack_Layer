@@ -14,9 +14,18 @@ def quarantine_memory(
     poison_score
 ):
 
+    import hashlib
+    import uuid
+    from datetime import datetime
+
+    unique_id_str = f"{user_id}:{fact}:{datetime.utcnow().timestamp()}:{uuid.uuid4()}"
+    unique_id = hashlib.sha256(unique_id_str.encode('utf-8')).hexdigest()
+
     record = QuarantineMemory(
 
         user_id=user_id,
+
+        unique_id=unique_id,
 
         fact=fact,
 

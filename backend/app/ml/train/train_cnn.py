@@ -12,7 +12,7 @@ def train_cnn(X_train, y_train, X_val, y_val):
     
     batch_size = 64
     learning_rate = 0.002
-    epochs = 100
+    epochs = 10
     
     train_dataset = TensorDataset(torch.FloatTensor(X_train), torch.LongTensor(y_train))
     val_dataset = TensorDataset(torch.FloatTensor(X_val), torch.LongTensor(y_val))
@@ -21,7 +21,8 @@ def train_cnn(X_train, y_train, X_val, y_val):
     
     model = CNN1DClassifier().to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    # Increase weight decay from 1e-4 to 1e-3 for L2 weight regularization
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-3)
     
     best_val_loss = float('inf')
     patience = 10
@@ -33,8 +34,17 @@ def train_cnn(X_train, y_train, X_val, y_val):
         train_loss = 0.0
         for batch_x, batch_y in train_loader:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+            
+            # 1. Adversarial noise injection
+            noise = torch.randn_like(batch_x) * 0.05
+            batch_x_noisy = batch_x + noise
+            
+            # 2. Sequence shift perturbation (simulate padding shifts)
+            shift = int(torch.randint(-3, 4, (1,)).item())
+            batch_x_noisy = torch.roll(batch_x_noisy, shifts=shift, dims=1)
+            
             optimizer.zero_grad()
-            outputs = model(batch_x)
+            outputs = model(batch_x_noisy)
             loss = criterion(outputs, batch_y)
             loss.backward()
             optimizer.step()

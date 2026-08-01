@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { getHitlQueue, approveHitlRequest, rejectHitlRequest, getResolvedHitlItems } from "../api/attacklayer";
+import { 
+    getHitlQueue, 
+    approveHitlRequest, 
+    rejectHitlRequest, 
+    getResolvedHitlItems,
+    getPendingIps,
+    getResolvedIps,
+    approveIpBlock,
+    rejectIpBlock
+} from "../api/attacklayer";
 import "../styles/hitl.css";
 
 let toastId = 0;
@@ -90,25 +99,93 @@ function HITLCard({ request, onApprove, onReject }) {
     );
 }
 
+function IPHITLCard({ item, onApprove, onReject }) {
+    const [busy, setBusy] = useState(false);
+
+    async function handleApprove() {
+        setBusy(true);
+        await onApprove(item.ip_address);
+        setBusy(false);
+    }
+
+    async function handleReject() {
+        setBusy(true);
+        await onReject(item.ip_address);
+        setBusy(false);
+    }
+
+    return (
+        <div className="hitl-card" style={{ borderColor: "var(--color-warning)" }}>
+            <div className="hitl-card-header">
+                <div>
+                    <div className="hitl-card-id">🌐 Target IP: {item.ip_address}</div>
+                    <div className="hitl-card-tags">
+                        <span className="hitl-tag threat">EXCESSIVE_BLOCKS</span>
+                        <span className="hitl-tag severity-high">HIGH RISK</span>
+                        <span className="hitl-tag status-pending">⏳ Pending IP Block Approval</span>
+                    </div>
+                </div>
+                <div className="hitl-timestamp">{item.timestamp}</div>
+            </div>
+
+            <div className="hitl-card-body">
+                <div className="hitl-field">
+                    <div className="hitl-field-label">Target IP Address</div>
+                    <div className="hitl-field-value prompt-text">{item.ip_address}</div>
+                </div>
+                <div className="hitl-field">
+                    <div className="hitl-field-label">Detection Reason</div>
+                    <div className="hitl-field-value reason-text">
+                        {item.detection_reason}
+                    </div>
+                </div>
+                <div className="hitl-field">
+                    <div className="hitl-field-label">Interaction Metrics</div>
+                    <div className="hitl-field-value reason-text">
+                        Total Requests: <strong>{item.total_interactions}</strong> | Blocked: <strong>{item.block_count} ({item.block_rate_pct}%)</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div className="hitl-card-footer">
+                <button className="reject-btn" style={{ background: "#ef4444" }} onClick={handleApprove} disabled={busy}>
+                    🚫 Approve & Block IP
+                </button>
+                <button className="approve-btn" style={{ background: "#10b981" }} onClick={handleReject} disabled={busy}>
+                    ✅ Reject Block & Allow IP
+                </button>
+            </div>
+        </div>
+    );
+}
+
+
 function HITLPage() {
     const [queue, setQueue] = useState([]);
+    const [ipQueue, setIpQueue] = useState([]);
     const [loading, setLoading] = useState(true);
     const [approved, setApproved] = useState(0);
     const [rejected, setRejected] = useState(0);
     const [answeredItems, setAnsweredItems] = useState([]);
+    const [resolvedIps, setResolvedIps] = useState([]);
     const [activeTab, setActiveTab] = useState("prompts");
+    const [manualIp, setManualIp] = useState("");
     const { toasts, addToast } = useToasts();
 
     const loadQueue = useCallback(async () => {
         try {
-            const [queueData, resolvedData] = await Promise.all([
+            const [queueData, resolvedData, pendingIpsData, resolvedIpsData] = await Promise.all([
                 getHitlQueue(),
                 getResolvedHitlItems(),
+                getPendingIps(),
+                getResolvedIps(),
             ]);
-            setQueue(queueData);
-            setAnsweredItems(resolvedData);
-            setApproved(resolvedData.filter((r) => r.status === "approved").length);
-            setRejected(resolvedData.filter((r) => r.status === "rejected").length);
+            setQueue(queueData || []);
+            setAnsweredItems(resolvedData || []);
+            setIpQueue(pendingIpsData || []);
+            setResolvedIps(resolvedIpsData || []);
+            setApproved((resolvedData || []).filter((r) => r.status === "approved").length);
+            setRejected((resolvedData || []).filter((r) => r.status === "rejected").length);
         } catch {
             addToast("Failed to load HITL queue", "error");
         } finally {
@@ -121,6 +198,25 @@ function HITLPage() {
         const timer = setInterval(loadQueue, 5000);
         return () => clearInterval(timer);
     }, [loadQueue]);
+
+    async function handleManualIpBlock(e) {
+        if (e) e.preventDefault();
+        const trimmed = manualIp.trim();
+        if (!trimmed) {
+            addToast("Please enter a valid IP address to block", "error");
+            return;
+        }
+        try {
+            await approveIpBlock(trimmed);
+            setApproved((n) => n + 1);
+            setManualIp("");
+            addToast(`🚫 IP ${trimmed} manually BLOCKED by human reviewer`, "success");
+            loadQueue();
+        } catch {
+            addToast("Failed to manually block IP", "error");
+        }
+    }
+
 
     async function handleApprove(id) {
         try {
@@ -166,6 +262,30 @@ function HITLPage() {
         }
     }
 
+    async function handleApproveIp(ipAddress) {
+        try {
+            await approveIpBlock(ipAddress);
+            setIpQueue((prev) => prev.filter((item) => item.ip_address !== ipAddress));
+            setApproved((n) => n + 1);
+            addToast(`🚫 IP ${ipAddress} approved and BLOCKED`, "success");
+            loadQueue();
+        } catch {
+            addToast("Failed to approve IP block", "error");
+        }
+    }
+
+    async function handleRejectIp(ipAddress) {
+        try {
+            await rejectIpBlock(ipAddress);
+            setIpQueue((prev) => prev.filter((item) => item.ip_address !== ipAddress));
+            setRejected((n) => n + 1);
+            addToast(`✅ IP ${ipAddress} unblocked (marked Trusted)`, "info");
+            loadQueue();
+        } catch {
+            addToast("Failed to reject IP block", "error");
+        }
+    }
+
     if (loading) {
         return (
             <div className="loading-state">
@@ -177,18 +297,21 @@ function HITLPage() {
 
     const promptQueue = queue.filter(req => req.memory_id == null);
     const memoryQueue = queue.filter(req => req.memory_id != null);
-    const activeQueue = activeTab === "prompts" ? promptQueue : memoryQueue;
+    
+    const activeQueue = activeTab === "prompts" ? promptQueue : activeTab === "memories" ? memoryQueue : ipQueue;
     
     const resolvedPrompts = answeredItems.filter(item => item.memory_id == null);
     const resolvedMemories = answeredItems.filter(item => item.memory_id != null);
-    const activeResolved = activeTab === "prompts" ? resolvedPrompts : resolvedMemories;
+    const activeResolved = activeTab === "prompts" ? resolvedPrompts : activeTab === "memories" ? resolvedMemories : resolvedIps;
+
+    const totalPendingCount = queue.length + ipQueue.length;
 
     return (
         <>
             <div className="page-header">
                 <h1 className="page-title">Human Validation Center</h1>
                 <p className="page-subtitle">
-                    Review flagged requests that require human approval before the AI responds
+                    Review flagged requests, memory scans, and IP address block requests requiring human approval
                 </p>
             </div>
 
@@ -196,9 +319,9 @@ function HITLPage() {
             <div className="hitl-stats-row">
                 <div className="hitl-stat-card">
                     <div className="hitl-stat-value" style={{ color: "var(--color-warning)" }}>
-                        {queue.length}
+                        {totalPendingCount}
                     </div>
-                    <div className="hitl-stat-label">Pending Review</div>
+                    <div className="hitl-stat-label">Total Pending Reviews</div>
                 </div>
                 <div className="hitl-stat-card">
                     <div className="hitl-stat-value" style={{ color: "var(--color-success)" }}>
@@ -228,12 +351,79 @@ function HITLPage() {
                 >
                     Memory Scans ({memoryQueue.length})
                 </button>
+                <button 
+                    className={`hitl-tab-btn ${activeTab === "ips" ? "active" : ""}`}
+                    onClick={() => setActiveTab("ips")}
+                >
+                    🌐 IP Address Approvals ({ipQueue.length})
+                </button>
             </div>
+
+            {/* Manual IP Block Control Bar */}
+            {activeTab === "ips" && (
+                <div style={{
+                    background: "#ffffff",
+                    padding: "18px 24px",
+                    borderRadius: "10px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                    marginBottom: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "16px",
+                    flexWrap: "wrap"
+                }}>
+                    <div>
+                        <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "700", color: "#1e293b" }}>
+                            ⚡ Instant Manual IP Block
+                        </h4>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--color-text-muted, #64748b)" }}>
+                            Human reviewers can manually block any IP address at any time, instantly preventing all chat requests & memory storage.
+                        </p>
+                    </div>
+                    <form onSubmit={handleManualIpBlock} style={{ display: "flex", gap: "10px" }}>
+                        <input 
+                            type="text" 
+                            placeholder="Enter IP Address (e.g. 192.168.1.100)"
+                            value={manualIp}
+                            onChange={(e) => setManualIp(e.target.value)}
+                            style={{
+                                padding: "9px 14px",
+                                borderRadius: "6px",
+                                border: "1px solid #cbd5e1",
+                                background: "#ffffff",
+                                color: "#0f172a",
+                                fontSize: "13px",
+                                width: "260px",
+                                outline: "none"
+                            }}
+                        />
+                        <button
+                            type="submit"
+                            style={{
+                                padding: "9px 18px",
+                                borderRadius: "6px",
+                                background: "#ef4444",
+                                color: "#ffffff",
+                                border: "none",
+                                fontWeight: "600",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                boxShadow: "0 1px 2px rgba(239, 68, 68, 0.2)"
+                            }}
+                        >
+                            🚫 Block IP Now
+                        </button>
+                    </form>
+                </div>
+            )}
+
 
             {/* Queue header */}
             <div className="hitl-queue-header">
                 <div className="hitl-queue-title">
-                    Pending {activeTab === "prompts" ? "Prompts" : "Memory Scans"}
+                    Pending {activeTab === "prompts" ? "Prompts" : activeTab === "memories" ? "Memory Scans" : "IP Address Block Approvals"}
                     {activeQueue.length > 0 && (
                         <span className="hitl-count-badge">{activeQueue.length}</span>
                     )}
@@ -247,6 +437,7 @@ function HITLPage() {
                 </button>
             </div>
 
+
             {/* Queue */}
             {activeQueue.length === 0 ? (
                 <div className="hitl-empty">
@@ -254,18 +445,29 @@ function HITLPage() {
                         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
                     <h3>Queue is Clear</h3>
-                    <p>All pending {activeTab === "prompts" ? "prompts" : "memory scans"} have been processed. No pending human review required.</p>
+                    <p>All pending {activeTab === "prompts" ? "prompts" : activeTab === "memories" ? "memory scans" : "IP block reviews"} have been processed. No pending human review required.</p>
                 </div>
             ) : (
                 <div className="hitl-queue">
-                    {activeQueue.map((req) => (
-                        <HITLCard
-                            key={req.id}
-                            request={req}
-                            onApprove={handleApprove}
-                            onReject={handleReject}
-                        />
-                    ))}
+                    {activeTab === "ips" ? (
+                        activeQueue.map((item) => (
+                            <IPHITLCard
+                                key={item.id || item.ip_address}
+                                item={item}
+                                onApprove={handleApproveIp}
+                                onReject={handleRejectIp}
+                            />
+                        ))
+                    ) : (
+                        activeQueue.map((req) => (
+                            <HITLCard
+                                key={req.id}
+                                request={req}
+                                onApprove={handleApprove}
+                                onReject={handleReject}
+                            />
+                        ))
+                    )}
                 </div>
             )}
 
@@ -273,17 +475,21 @@ function HITLPage() {
             {activeResolved.length > 0 && (
                 <div style={{ marginTop: "2rem" }}>
                     <div className="hitl-queue-header">
-                        <div className="hitl-queue-title">Resolved {activeTab === "prompts" ? "Prompts" : "Memory Scans"}</div>
+                        <div className="hitl-queue-title">
+                            Resolved {activeTab === "prompts" ? "Prompts" : activeTab === "memories" ? "Memory Scans" : "IP Block Decisions"}
+                        </div>
                     </div>
                     <div className="hitl-queue">
                         {activeResolved.map((item) => (
                             <div key={item.id} className="hitl-card" style={{ opacity: 0.9 }}>
                                 <div className="hitl-card-header">
                                     <div>
-                                        <div className="hitl-card-id">{item.memory_id ? `Memory Item #${item.memory_id}` : `Request #${item.id}`}</div>
+                                        <div className="hitl-card-id">
+                                            {item.ip_address ? `IP Address: ${item.ip_address}` : item.memory_id ? `Memory Item #${item.memory_id}` : `Request #${item.id}`}
+                                        </div>
                                         <div className="hitl-card-tags">
                                             <span className={`hitl-tag ${item.status === "approved" ? "severity-low" : "severity-critical"}`}>
-                                                {item.status === "approved" ? "✓ Approved" : "✕ Rejected"}
+                                                {item.status === "approved" ? (item.ip_address ? "🚫 Block Approved" : "✓ Approved") : (item.ip_address ? "✅ Block Rejected (Allowed)" : "✕ Rejected")}
                                             </span>
                                         </div>
                                     </div>
@@ -296,9 +502,15 @@ function HITLPage() {
                                             <div className="hitl-field-value prompt-text">{item.prompt}</div>
                                         </div>
                                     )}
+                                    {item.ip_address && (
+                                        <div className="hitl-field">
+                                            <div className="hitl-field-label">Target IP Address</div>
+                                            <div className="hitl-field-value prompt-text">{item.ip_address}</div>
+                                        </div>
+                                    )}
                                     <div className="hitl-field">
                                         <div className="hitl-field-label">
-                                            {item.status === "approved" ? (item.memory_id ? "Memory Status" : "AI Response") : "Security Action"}
+                                            {item.status === "approved" ? (item.ip_address ? "IP Security Action" : item.memory_id ? "Memory Status" : "AI Response") : "Security Action"}
                                         </div>
                                         <div className="hitl-field-value reason-text">{item.response}</div>
                                     </div>
@@ -321,4 +533,4 @@ function HITLPage() {
     );
 }
 
-export default HITLPage;
+export default HITLPage;

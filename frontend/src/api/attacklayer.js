@@ -37,6 +37,27 @@ export async function rejectHitlRequest(requestId) {
     return response.data;
 }
 
+export async function getPendingIps() {
+    const response = await API.get("/hitl/ip/pending");
+    return response.data;
+}
+
+export async function getResolvedIps() {
+    const response = await API.get("/hitl/ip/resolved");
+    return response.data;
+}
+
+export async function approveIpBlock(ipAddress) {
+    const response = await API.post(`/hitl/ip/approve/${ipAddress}`);
+    return response.data;
+}
+
+export async function rejectIpBlock(ipAddress) {
+    const response = await API.post(`/hitl/ip/reject/${ipAddress}`);
+    return response.data;
+}
+
+
 /* ===== MEMORY ===== */
 export async function getAllMemories() {
     const response = await API.get("/memory/all");
@@ -300,4 +321,22 @@ export async function getMemoryRefreshStats() {
     const response = await API.get("/audit/memory-refresh-stats");
     return response.data;
 }
+
+export async function executeToolSimulation(toolName, parameters, userId = "default_user") {
+    const response = await API.post("/tool-policy/execute", parameters, {
+        params: { tool_name: toolName, user_id: userId }
+    });
+    return response.data;
+}
+
+export async function getToolPolicyViolations() {
+    const response = await API.get("/audit/tool-policy-violations");
+    return response.data;
+}
+
+export async function getTrustedToolsConfig() {
+    const response = await API.get("/research/trusted-tools");
+    return response.data;
+}
+
 

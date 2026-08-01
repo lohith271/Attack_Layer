@@ -26,6 +26,8 @@ TRUSTED_TOOLS = {
     "file_reader",
     "database_query",
     "calculator",
+    "allow_ip",
+    "block_ip",
 
 }
 
@@ -39,3 +41,9 @@ ALLOWED_BEHAVIORS = {
     "log all external tool calls",
 
 }
+
+CRITICAL_INFRA_IPS = {
+    "10.0.0.5",  # Internal DNS Server
+    "10.0.0.1",  # Network Gateway
+}
+

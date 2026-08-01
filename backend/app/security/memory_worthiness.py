@@ -37,7 +37,10 @@ STORE_PATTERNS = [
 
 
 def should_store_memory(text: str) -> dict:
-    stripped = text.strip()
+    text = text.strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
+    stripped = text
     lowered = stripped.lower()
 
     if stripped.endswith("?"):

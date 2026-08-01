@@ -86,6 +86,11 @@ function MemoryItem({ mem, onRefresh, setNotification }) {
                 <span className={`memory-meta-chip ${trustClass}`}>
                     Trust: {trust.toFixed(2)}
                 </span>
+                {mem.unique_id && (
+                    <span className="memory-meta-chip" title={`Unique SHA-256 ID: ${mem.unique_id}`} style={{ fontFamily: "monospace", fontSize: "11px", background: "rgba(139, 92, 246, 0.1)", color: "#8b5cf6", border: "1px solid rgba(139, 92, 246, 0.2)" }}>
+                        SHA256: {mem.unique_id.slice(0, 8)}
+                    </span>
+                )}
                 {mem.category && (
                     <span className="memory-meta-chip">{mem.category}</span>
                 )}

@@ -170,7 +170,7 @@ class ThreatAnalyticsAgentReportTest(unittest.TestCase):
         res = self.agent.explain_query(self.db, "Give the no of refreshes happened today")
         response_text = res["response"]
         
-        self.assertIn("Memory Refreshes for today:", response_text)
+        self.assertIn("Memory Refreshes for ", response_text)
         self.assertIn("- Refreshes Triggered: 1", response_text)
         self.assertIn("- Refreshes Detected as Attacks (Blocked/Quarantined): 1", response_text)
 

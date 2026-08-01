@@ -139,6 +139,13 @@ def _load_single_model(model_name: str):
         first_weight = next(iter(state.values()))
         input_dim = first_weight.shape[1]
         model = SimpleMLP(input_dim=input_dim)
+        
+        # Check if the loaded state dict belongs to a GroupNorm model (e.g. trained with DP-SGD)
+        has_running_mean = any("running_mean" in key for key in state.keys())
+        if not has_running_mean:
+            from opacus.validators import ModuleValidator
+            model = ModuleValidator.fix(model)
+            
         model.load_state_dict(state)
         model.eval()
         return model

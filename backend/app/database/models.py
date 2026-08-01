@@ -20,6 +20,13 @@ class Memory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    unique_id = Column(
+        String,
+        unique=True,
+        index=True,
+        nullable=True
+    )
+
     user_id = Column(String, nullable=False)
 
     fact = Column(
@@ -306,6 +313,13 @@ class QuarantineMemory(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    unique_id = Column(
+        String,
+        unique=True,
+        index=True,
+        nullable=True
     )
 
     user_id = Column(
@@ -727,3 +741,31 @@ class ClassificationStat(Base):
     is_false_negative = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =====================================================
+# BLOCKED IP REGISTRY & HUMAN APPROVAL
+# =====================================================
+
+class BlockedIP(Base):
+    __tablename__ = "blocked_ips"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    ip_address = Column(String, unique=True, nullable=False, index=True)
+
+    status = Column(String, default="TRUSTED")  # TRUSTED, PENDING, BLOCKED
+
+    block_count = Column(Integer, default=0)
+
+    total_interactions = Column(Integer, default=0)
+
+    block_rate = Column(Float, default=0.0)
+
+    reason = Column(String, default="EXCESSIVE_BLOCKS")
+
+    approved_by_human = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

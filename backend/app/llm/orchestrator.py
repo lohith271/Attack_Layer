@@ -7,6 +7,7 @@ from app.memory.retrieval import retrieve_memories
 from app.security.context_builder import build_secure_context
 from app.llm.service import generate_response
 from app.security.security_gateway import evaluate_security
+from app.security.llm_guardrails import llm_input_filter, llm_output_filter
 from app.memory.vault import create_memory
 from app.security.response_validator import validate_response
 from app.audit.logger import log_security_event
@@ -15,6 +16,8 @@ from app.security.memory_worthiness import should_store_memory
 from app.security.self_reflection import generate_reflection, store_reflection
 from app.learning.classification_tracker import record_classification
 from app.security.semantic_classifier import classify_query_categories
+from app.security.ip_guard import is_ip_blocked, evaluate_ip_for_human_approval
+
 
 
 def _should_use_personal_context(message):
@@ -114,11 +117,84 @@ def _handle_memory_store(
 def process_user_message(db: Session, user_id: str, message: str, ip_address: str = None):
     start_time = time.time()
 
+    message = message.strip()
+    if (message.startswith('"') and message.endswith('"')) or (message.startswith("'") and message.endswith("'")):
+        message = message[1:-1].strip()
+
+    # 1. EARLY INTERCEPT: If IP is blocked after human approval, reject immediately and DO NOT save memory
+    if ip_address and is_ip_blocked(db, ip_address):
+        elapsed = round((time.time() - start_time) * 1000, 2)
+        log_security_event(
+            db=db,
+            operation="BLOCKED_IP_ATTEMPT",
+            decision="BLOCK",
+            threat="BLOCKED_IP_ACCESS",
+            risk_score=1.0,
+            payload=message,
+            ip_address=ip_address,
+            execution_time_ms=elapsed,
+            final_decision="BLOCK",
+            explanation={"reason": "Request rejected because IP address is blocked by human approval."}
+        )
+        return {
+            "response": f"⛔ **Access Denied**: So many blocks have come from your IP address (`{ip_address}`), and it has been officially BLOCKED following security approval. No actions or memories will be saved.",
+            "retrieved_memories": [],
+            "security": {"decision": "BLOCK", "threat": "BLOCKED_IP", "risk_score": 1.0, "operation": "UNKNOWN"},
+            "memory": None
+        }
+
+    # 2. Additive Regex Input Filter check
+    if llm_input_filter(message):
+        elapsed = round((time.time() - start_time) * 1000, 2)
+        fake_security_result = {
+            "decision": "BLOCK",
+            "threat": "PROMPT_INJECTION",
+            "risk_score": 1.0,
+            "operation": "GENERAL_CHAT",
+            "intent": "SYSTEM_QUERY",
+            "intent_confidence": 1.0,
+            "attack_type": "PROMPT_INJECTION",
+            "attack_confidence": 1.0,
+            "risk_level": "HIGH",
+            "category": "GENERAL",
+            "input": message,
+            "explanation": {"reason": "Request blocked by additive regex prompt injection input filter."}
+        }
+        log_security_event(
+            db=db,
+            operation="GENERAL_CHAT",
+            decision="BLOCK",
+            threat="PROMPT_INJECTION",
+            risk_score=1.0,
+            payload=message,
+            intent="SYSTEM_QUERY",
+            intent_confidence=1.0,
+            attack_type="PROMPT_INJECTION",
+            attack_confidence=1.0,
+            risk_level="HIGH",
+            memory_category="GENERAL",
+            conflict_status="NONE",
+            execution_time_ms=elapsed,
+            final_decision="BLOCK",
+            explanation=fake_security_result["explanation"],
+            ip_address=ip_address,
+        )
+        return {
+            "response": "I can only help with cooking.",
+            "retrieved_memories": [],
+            "security": fake_security_result,
+            "memory": None,
+            "dashboard": _build_dashboard_payload(
+                fake_security_result, None, None, elapsed, "BLOCK"
+            ),
+        }
+
     security_result = evaluate_security(
         message,
         db=db,
         user_id=user_id,
     )
+
 
     operation = security_result["operation"]
 
@@ -142,7 +218,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
     if security_result["decision"] == "BLOCK":
         elapsed = round((time.time() - start_time) * 1000, 2)
 
-        log_security_event(
+        event = log_security_event(
             db=db,
             operation=operation,
             decision="BLOCK",
@@ -164,65 +240,24 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             ip_address=ip_address,
         )
 
-        block_response = (
-            "I can't retain sensitive credentials or secret information."
-        )
+        attack_type = security_result.get("attack_type", "SAFE")
+        block_response = f"⚠ Request blocked by Security Policy (Reason: {attack_type})."
 
-        attack_type = security_result.get("attack_type")
-        sensitive_type = security_result.get("sensitive_type")
-
-        if sensitive_type and sensitive_type != "NONE":
-            block_response = (
-                "I can't retain sensitive credentials or secret information."
-            )
-        elif attack_type == "TOOL_MANIPULATION":
-            block_response = (
-                "⚠ Unsafe tool policy blocked.\n\n"
-                "Reason: TOOL_MANIPULATION"
-            )
-        elif attack_type == "PROMPT_INJECTION":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: Prompt injection detected."
-            )
-        elif attack_type == "FALSE_FACT_INJECTION":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: False fact injection detected."
-            )
-        elif attack_type == "MEMORY_POISONING":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: Memory poisoning detected."
-            )
-        elif attack_type == "MEMORY_OVERWRITE":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: Memory overwrite detected."
-            )
-        elif attack_type == "PROPAGATION_ATTACK":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: Propagation attack detected."
-            )
-        elif attack_type == "ROLE_HIJACK":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: Role hijacking detected."
-            )
-        elif attack_type == "PREFERENCE_MANIPULATION":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: Preference manipulation detected."
-            )
-        elif attack_type == "SYSTEM_PROMPT_EXTRACTION":
-            block_response = (
-                "⚠ Request blocked.\n\n"
-                "Reason: System prompt extraction detected."
-            )
+        hitl_request_id = None
+        if ip_address:
+            ip_eval = evaluate_ip_for_human_approval(db, ip_address)
+            if ip_eval.get("send_to_hitl"):
+                block_response = (
+                    f"⚠ Request blocked by Security Policy (Reason: {attack_type}).\n\n"
+                    f"Notice: Out of your last **{ip_eval['total_interactions']} interactions**, "
+                    f"**{ip_eval['blocked_count']} ({ip_eval['block_rate_pct']}%)** were blocked by our security policy. "
+                    f"Your IP address (`{ip_address}`) has been submitted to Human Approval for blocking review."
+                )
+                hitl_request_id = event.id if event else None
 
         return {
             "response": block_response,
+            "hitl_request_id": hitl_request_id,
             "retrieved_memories": [],
             "security": security_result,
             "memory": None,
@@ -306,6 +341,119 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             ),
         }
 
+    # Intercept tool-use queries in chat to simulate execution-time firewall
+    import re
+    action_keywords = ["search", "fetch", "read", "query", "get", "connect", "summarize", "download", "run"]
+    has_action = any(kw in message.lower() for kw in action_keywords)
+    domain_match = re.search(r'(?:https?://)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\S*)?)', message.lower())
+    
+    if has_action and domain_match:
+        raw_url = domain_match.group(1)
+        domain = raw_url.replace("https://", "").replace("http://", "").split("/")[0].split("?")[0].split("#")[0].strip(".,?!:;()")
+        
+        from app.memory_security.detectors.tool_policy_validator import ToolPolicyValidator
+        tool_name = "web_search"
+        if "db" in message.lower() or "database" in message.lower():
+            tool_name = "database_query"
+            
+        tool_result = ToolPolicyValidator.validate_tool_execution(
+            db=db,
+            tool_name=tool_name,
+            parameters={"url": f"https://{domain}"},
+            user_id=user_id,
+            original_user_prompt=message
+        )
+        
+        elapsed = round((time.time() - start_time) * 1000, 2)
+        
+        if tool_result["decision"] == "BLOCK":
+            from app.memory_security.services.tool_policy_event_logger import log_tool_policy_event
+            log_tool_policy_event(
+                db=db,
+                user_id=user_id,
+                policy_text=f"Execution of tool {tool_name} with params {{'url': 'https://{domain}'}} (via Chat)",
+                violation_reason=tool_result["violation_reason"],
+                risk_score=tool_result["risk_score"],
+                decision="BLOCK",
+                unapproved_domains=domain
+            )
+            
+            block_response = (
+                f"⚠ **Tool Execution Blocked**\n\n"
+                f"**Tool**: `{tool_name}`\n"
+                f"**Reason**: `UNAPPROVED_DOMAIN:{domain}`\n"
+                f"**Risk Score**: `{tool_result['risk_score']}`\n\n"
+                f"This connection has been terminated by your Security Policy."
+            )
+            return {
+                "response": block_response,
+                "retrieved_memories": [],
+                "security": security_result,
+                "memory": None,
+                "validation": None,
+                "dashboard": _build_dashboard_payload(
+                    security_result, None, None, elapsed, "BLOCK"
+                ),
+            }
+        else:
+            # Inject mock data representing successful API payload retrieval for trusted domain
+            mock_data = f"Web content retrieved from trusted endpoint: {domain}. Status: Active. Safety: OK."
+            if "github" in domain:
+                mock_data = "Repository name: AttackLayer. Owner: SharvaniLekkala. Stars: 342. Open issues: 4. Latest commit: 'Implemented tool policy execution check & live dashboard update logs'."
+            elif "openai" in domain:
+                mock_data = "OpenAI API service is operational. Current active models: gpt-4o, gpt-4-turbo, text-embedding-3-small."
+            
+            # Fetch personal context if needed
+            secure_context = ""
+            retrieval_result = None
+            if _should_use_personal_context(message):
+                retrieval_result = retrieve_memories(
+                    db=db,
+                    user_id=user_id,
+                    query=message,
+                )
+                secure_context = build_secure_context(
+                    query=message,
+                    safe_memories=retrieval_result["safe_memories"],
+                    ranked_memories=retrieval_result.get("ranked_memories", []),
+                )
+            
+            extended_query = (
+                f"{message}\n\n"
+                f"[System Note: Below is the web content retrieved from the trusted domain '{domain}':\n"
+                f"{mock_data}\n"
+                f"Please summarize this information to answer the user's query. "
+                f"If this information does not contain the answer, you are allowed and expected to use "
+                f"your own general pre-trained knowledge about '{domain}' to answer the user's question correctly.]"
+            )
+            
+            llm_response = generate_response(query=extended_query, secure_context=secure_context)
+            llm_response = llm_output_filter(llm_response)
+            success_prefix = (
+                f"✅ **Tool Execution Allowed**\n"
+                f"*Successfully connected to trusted domain: `{domain}` via `{tool_name}`*\n\n"
+            )
+            
+            validation = validate_response(
+                llm_response,
+                message,
+                memories_used=(retrieval_result.get("ranked_memories", []) if retrieval_result else []),
+                security_result=security_result,
+            )
+            validation["response"] = success_prefix + validation["response"]
+            
+            return {
+                "response": validation["response"],
+                "retrieved_memories": (retrieval_result["safe_memories"] if retrieval_result else []),
+                "security": security_result,
+                "memory": None,
+                "validation": validation,
+                "dashboard": _build_dashboard_payload(
+                    security_result, retrieval_result, validation, elapsed,
+                    security_result["decision"]
+                ),
+            }
+
     retrieval_result = None
     ranked_memories = []
     memories_used = []
@@ -327,6 +475,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             )
 
         llm_response = generate_response(query=message, secure_context=secure_context)
+        llm_response = llm_output_filter(llm_response)
         validation = validate_response(
             llm_response,
             message,
@@ -342,6 +491,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
                     + "\nAnswer accurately. Do not leak internal details."
                 ),
             )
+            llm_response = llm_output_filter(llm_response)
             validation = validate_response(
                 llm_response,
                 message,
@@ -421,6 +571,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
             query=message,
             secure_context=secure_context,
         )
+        llm_response = llm_output_filter(llm_response)
 
         validation = validate_response(
             llm_response,
@@ -434,6 +585,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
                 query=message,
                 secure_context=secure_context + "\nBe precise. Only use listed memories.",
             )
+            llm_response = llm_output_filter(llm_response)
             validation = validate_response(
                 llm_response,
                 message,
@@ -533,6 +685,7 @@ def process_user_message(db: Session, user_id: str, message: str, ip_address: st
         return result
 
     llm_response = generate_response(query=message, secure_context="")
+    llm_response = llm_output_filter(llm_response)
     validation = validate_response(
         llm_response, message, security_result=security_result,
     )

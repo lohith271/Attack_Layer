@@ -1,41 +1,38 @@
 import os
 import joblib
+import numpy as np
 from lightgbm import LGBMClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.calibration import CalibratedClassifierCV
 from app.ml.utils import load_split_data
 
 def main():
-    print("--- Training LightGBM ---")
+    print("--- Training LightGBM (Hardened) ---")
     X_train, X_val, X_test, y_train, y_val, y_test = load_split_data()
     
-    param_grid = {
-        'num_leaves': [15, 31, 63],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2]
-    }
+    # Augment training data with adversarial Gaussian noise to smooth boundary
+    np.random.seed(42)
+    noise = np.random.normal(0, 0.03, X_train.shape)
+    X_train_aug = np.vstack([X_train, X_train + noise])
+    y_train_aug = np.hstack([y_train, y_train])
     
-    print("Performing grid search...")
-    # Use CPU explicitly
-    grid = GridSearchCV(
-        LGBMClassifier(
-            class_weight='balanced', 
-            random_state=42, 
-            n_jobs=-1, 
-            verbose=-1, 
-            device='cpu'
-        ), 
-        param_grid, 
-        cv=5, 
-        scoring='f1'
+    print("Fitting LGBMClassifier directly...")
+    best_lgb = LGBMClassifier(
+        class_weight='balanced',
+        max_depth=5,
+        num_leaves=31,
+        learning_rate=0.1,
+        reg_lambda=1.0,
+        random_state=42,
+        n_jobs=-1,
+        verbose=-1,
+        device='cpu'
     )
-    grid.fit(X_train, y_train)
-    
-    best_lgb = grid.best_estimator_
-    print(f"Best parameters found: {grid.best_params_}")
+    best_lgb.fit(X_train_aug, y_train_aug)
     
     print("Calibrating classifier...")
     model = CalibratedClassifierCV(estimator=best_lgb, cv=5)
-    model.fit(X_train, y_train)
+    model.fit(X_train_aug, y_train_aug)
     
     models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
     os.makedirs(models_dir, exist_ok=True)
